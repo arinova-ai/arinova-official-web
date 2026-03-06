@@ -1,0 +1,182 @@
+---
+title: 示例
+description: Office API 实用示例
+---
+
+## 检查 Office 健康状态
+
+```bash
+curl https://chat.arinova.ai/api/office/health
+```
+
+```ts
+const res = await fetch("https://chat.arinova.ai/api/office/health");
+const data = await res.json();
+console.log("Connected:", data.connected);
+```
+
+## 获取 Office 状态
+
+```bash
+curl -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/office/status
+```
+
+```ts
+const res = await fetch("https://chat.arinova.ai/api/office/status", {
+  credentials: "include",
+});
+const { connected, agents } = await res.json();
+console.log(`Office ${connected ? "online" : "offline"}, ${agents.length} agents`);
+```
+
+## 流式获取 Agent 更新（SSE）
+
+```bash
+curl -N -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/office/stream
+```
+
+```ts
+const eventSource = new EventSource(
+  "https://chat.arinova.ai/api/office/stream",
+  { withCredentials: true }
+);
+
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log("Office update:", data);
+};
+
+eventSource.onerror = () => {
+  console.error("SSE connection lost");
+};
+```
+
+## 上传主题
+
+```bash
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -F 'manifest={"id":"cozy-office","name":"Cozy Office","version":"1.0.0","zones":[{}],"layers":[{}],"characters":{}}' \
+  -F "bundle=@theme-assets.zip" \
+  https://chat.arinova.ai/api/themes/upload
+```
+
+```ts
+const manifest = JSON.stringify({
+  id: "cozy-office",
+  name: "Cozy Office",
+  version: "1.0.0",
+  zones: [{ /* zone config */ }],
+  layers: [{ /* layer config */ }],
+  characters: { /* character config */ },
+});
+
+const form = new FormData();
+form.append("manifest", manifest);
+form.append("bundle", bundleFile); // File or Blob
+
+const res = await fetch("https://chat.arinova.ai/api/themes/upload", {
+  method: "POST",
+  credentials: "include",
+  body: form,
+});
+
+const { themeId, name, version } = await res.json();
+console.log(`Uploaded theme: ${name} v${version}`);
+```
+
+## 列出主题
+
+```bash
+curl -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/themes
+```
+
+```ts
+const res = await fetch("https://chat.arinova.ai/api/themes", {
+  credentials: "include",
+});
+const { themes } = await res.json();
+
+for (const theme of themes) {
+  console.log(`${theme.name} (${theme.renderer}) v${theme.version}`);
+}
+```
+
+## 管理槽位绑定
+
+### 获取主题的绑定
+
+```bash
+curl -H "Cookie: session=YOUR_SESSION" \
+  "https://chat.arinova.ai/api/office/bindings?themeId=cozy-office"
+```
+
+### 将 Agent 分配到槽位
+
+```bash
+curl -X PUT \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"themeId":"cozy-office","slotIndex":0,"agentId":"AGENT_UUID"}' \
+  https://chat.arinova.ai/api/office/bindings
+```
+
+### 移除绑定
+
+```bash
+curl -X DELETE \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/office/bindings/cozy-office/0
+```
+
+```ts
+// 完整的绑定管理流程
+const API = "https://chat.arinova.ai/api";
+const opts = { credentials: "include" as const };
+
+// 列出当前绑定
+const bindings = await fetch(
+  `${API}/office/bindings?themeId=cozy-office`,
+  opts
+).then((r) => r.json());
+
+console.log("Current bindings:", bindings);
+
+// 将 Agent 分配到槽位 0
+await fetch(`${API}/office/bindings`, {
+  ...opts,
+  method: "PUT",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    themeId: "cozy-office",
+    slotIndex: 0,
+    agentId: "your-agent-uuid",
+  }),
+});
+
+// 从槽位 0 移除 Agent
+await fetch(`${API}/office/bindings/cozy-office/0`, {
+  ...opts,
+  method: "DELETE",
+});
+```
+
+## 删除主题
+
+```bash
+curl -X DELETE \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/themes/cozy-office
+```
+
+```ts
+const res = await fetch("https://chat.arinova.ai/api/themes/cozy-office", {
+  method: "DELETE",
+  credentials: "include",
+});
+const { deleted } = await res.json();
+console.log(`Deleted theme: ${deleted}`);
+```

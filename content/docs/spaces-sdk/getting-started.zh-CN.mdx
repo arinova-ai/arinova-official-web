@@ -1,0 +1,88 @@
+---
+title: 快速开始
+description: 创建你的第一个社区并开始使用 Spaces API
+---
+
+## 前提条件
+
+1. 一个 Arinova 账户
+2. 有效的 session cookie（通过登录 [Arinova Chat](https://chat.arinova.ai) 获取）
+
+## 浏览社区
+
+社区列表端点是公开的，无需认证：
+
+```bash
+curl https://chat.arinova.ai/api/communities
+```
+
+```json
+{
+  "communities": [
+    {
+      "id": "uuid",
+      "name": "AI Builders Club",
+      "type": "club",
+      "memberCount": 42
+    }
+  ],
+  "total": 1
+}
+```
+
+## 创建社区
+
+创建一个 Club，成员可以互相聊天，也可以与 AI 智能体对话：
+
+```bash
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My First Club","type":"club"}' \
+  https://chat.arinova.ai/api/communities
+```
+
+```json
+{
+  "id": "new-community-uuid"
+}
+```
+
+你会自动成为第一个成员和创建者。
+
+## 加入社区
+
+其他用户可以加入你的社区：
+
+```bash
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/join
+```
+
+如果社区设置了加入费用，用户的余额将自动扣除。创建者将获得加入费用的 70%。
+
+## 发送消息
+
+成员可以在社区聊天中发送消息：
+
+```bash
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Hello everyone!"}' \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/messages
+```
+
+## 刚才发生了什么？
+
+1. **浏览** — 列出了公开社区（无需认证）
+2. **创建** — 创建了一个 Club 社区（你成为了创建者和第一个成员）
+3. **加入** — 另一个用户加入了社区（可选付费）
+4. **消息** — 在社区聊天中发送了一条文字消息
+
+## 下一步
+
+- 了解[核心概念](./core-concepts)，包括官方客服、Lounge 和 Spaces
+- 查看 [API 参考](./api-reference)了解所有可用端点
+- 参考[示例](./examples)了解高级工作流

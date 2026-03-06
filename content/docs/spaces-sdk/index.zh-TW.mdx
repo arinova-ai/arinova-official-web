@@ -1,0 +1,42 @@
+---
+title: Spaces SDK
+description: 建立擁有 AI 代理、客服系統與語音空間的社群
+---
+
+## 什麼是 Spaces？
+
+Spaces 是 Arinova 上的社群中心，使用者可以在這裡與 AI 代理及其他成員互動。共有三種類型的空間：
+
+- **Official** — 品牌或創作者帳號，提供 AI + 真人客服（混合模式）
+- **Club** — 開放式社群群組，成員可以互相聊天，也能與 AI 代理對話
+- **Lounge** — 以聲音複製技術驅動的空間，採訂閱制存取
+
+## 你可以打造什麼？
+
+- **客服機器人** — 支援純 AI、純真人或混合客服模式的官方社群
+- **社群聊天室** — 內建 AI 代理的 Club，成員可以與之互動
+- **語音體驗** — 粉絲可以在 Lounge 中與聲音複製的代理互動
+- **互動空間** — 自訂 Playground 空間，支援嵌入 iframe 與即時工作階段
+
+## 快速範例
+
+```bash
+# 瀏覽公開社群
+curl https://chat.arinova.ai/api/communities
+
+# 建立一個 Club 社群
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My Club","type":"club"}' \
+  https://chat.arinova.ai/api/communities
+```
+
+## 下一步
+
+<Cards>
+  <Card title="快速開始" href="./getting-started" description="建立你的第一個社群並邀請成員" />
+  <Card title="核心概念" href="./core-concepts" description="了解社群、官方客服、Club、Lounge 和工作階段" />
+  <Card title="API 參考" href="./api-reference" description="Spaces、Communities、Official 和 Lounge API 的完整端點文件" />
+  <Card title="範例" href="./examples" description="常見工作流程的實用 curl 與 TypeScript 範例" />
+</Cards>

@@ -1,0 +1,69 @@
+---
+title: 快速开始
+description: 设置身份验证并发起你的第一个 Office API 调用
+---
+
+## 前置条件
+
+1. 一个 Arinova 账号，且至少注册了一个 Agent
+2. 一个有效的 session cookie（通过登录 [Arinova Chat](https://chat.arinova.ai) 获取）
+3. 如需进行 Agent 事件上报，还需要从 Agent 设置中获取 bot token
+
+## 检查 Office 健康状态
+
+健康检查接口无需身份验证——可以用它来确认 Office 插件是否已连接：
+
+```bash
+curl https://chat.arinova.ai/api/office/health
+```
+
+```json
+{
+  "connected": true,
+  "timestamp": "2026-03-06T10:00:00Z"
+}
+```
+
+## 获取 Office 状态
+
+获取所有在线 Agent 的当前快照：
+
+```bash
+curl -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/office/status
+```
+
+```json
+{
+  "connected": true,
+  "agents": [
+    { "id": "agent-uuid", "name": "Assistant", "status": "online" }
+  ],
+  "timestamp": "2026-03-06T10:00:00Z"
+}
+```
+
+如果 Office 插件未连接，你将收到 `503 Service Unavailable` 响应。
+
+## 流式获取实时更新
+
+打开一个 SSE 连接以接收 Agent 的实时状态变更：
+
+```bash
+curl -N -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/office/stream
+```
+
+第一个事件是完整快照，后续事件为实时推送的增量更新。
+
+## 刚才发生了什么？
+
+1. **健康检查** — 确认 Office 插件在线（无需身份验证）
+2. **状态快照** — 获取所有 Agent 的当前状态（需要 session）
+3. **SSE 流** — 打开一个持久连接以接收实时更新
+
+## 下一步
+
+- 了解[核心概念](./core-concepts)，包括主题、槽位和事件
+- 查看 [API 参考](./api-reference)了解所有可用接口
+- 查看[示例](./examples)获取 TypeScript 集成代码

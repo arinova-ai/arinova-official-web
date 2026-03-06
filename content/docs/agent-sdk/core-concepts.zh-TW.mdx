@@ -1,6 +1,6 @@
 ---
 title: 核心概念
-description: 了解連線、任務、串流傳輸和技能的運作方式
+description: 了解連線、任務、串流、檔案、筆記等運作方式
 ---
 
 ## 連線生命週期
@@ -8,12 +8,12 @@ description: 了解連線、任務、串流傳輸和技能的運作方式
 當你的 Agent 呼叫 `connect()` 時，會發生以下流程：
 
 ```
-connect() → WebSocket open → Send auth (botToken)
-                                    │
-                              ┌─────┴──────┐
-                              │  auth_ok   │ → "connected" event → Ready for tasks
-                              │ auth_error │ → "error" event → Stop (no reconnect)
-                              └────────────┘
+connect() -> WebSocket open -> Send auth (botToken)
+                                    |
+                              +-----+------+
+                              |  auth_ok   | -> "connected" event -> Ready for tasks
+                              | auth_error | -> "error" event -> Stop (no reconnect)
+                              +------------+
 ```
 
 如果連線意外中斷，SDK 會在 `reconnectInterval`（預設為 5 秒）之後自動重新連線。但在驗證錯誤的情況下，SDK **不會**嘗試重連。
@@ -45,6 +45,31 @@ agent.onTask(async (task) => {
 
 如果你的處理函式拋出例外，SDK 會自動呼叫 `sendError()` 並附上錯誤訊息。
 
+## 豐富的任務上下文
+
+`TaskContext` 物件包含的不只是訊息文字。你可以存取關於發送者、對話和訊息的詳細資訊：
+
+```ts
+agent.onTask(async (task) => {
+  // 訊息發送者
+  console.log(task.senderUserId);    // User ID of the sender
+  console.log(task.senderUsername);   // Username of the sender
+
+  // 對話資訊
+  console.log(task.conversationType); // "dm", "group", or "community"
+  console.log(task.members);          // Array of conversation members
+
+  // 訊息上下文
+  console.log(task.replyTo);          // Reply context if this is a reply
+  console.log(task.attachments);      // File attachments on the message
+  console.log(task.history);          // Recent message history
+
+  task.sendComplete("Got it!");
+});
+```
+
+這些豐富的上下文資訊讓你能建構根據發話者身份、對話類型、以及引用的檔案或訊息來做出不同回應的 Agent。
+
 ## 串流回應
 
 對於需要較長時間處理的任務，你可以即時分段將內容串流傳送給使用者。這讓使用者能立即看到回應，而不用等到完整結果產生才收到。
@@ -68,6 +93,153 @@ agent.onTask(async (task) => {
 - **`sendError(error)`** — 將任務標記為失敗，並附上錯誤訊息。
 
 傳入 `sendComplete` 的 `content` 是**完整的最終回應**，而不只是最後一個片段。
+
+### 提及
+
+在傳送完整回應時，你可以 @提及特定使用者：
+
+```ts
+task.sendComplete("Here's the answer for you!", {
+  mentions: ["user-id-1", "user-id-2"],
+});
+```
+
+`mentions` 選項接受一個使用者 ID 陣列。被提及的使用者將會收到通知。
+
+## 主動發送訊息
+
+你的 Agent 可以在任何時候向對話發送訊息，不限於回應任務時。這對於通知、定期更新或後續追蹤訊息非常有用。
+
+```ts
+// Send a message to a conversation
+await agent.sendMessage(conversationId, "Hey! Just a reminder about your task.");
+```
+
+SDK 優先使用 WebSocket 連線，如果 WebSocket 未連線則會自動退回使用 HTTP POST。這代表即使在短暫斷線期間，主動發送訊息仍能可靠運作。
+
+## 檔案上傳
+
+Agent 可以將檔案（圖片、文件等）上傳到對話中。這是透過 agent 上傳端點完成的，檔案會儲存在 R2 雲端儲存空間中。
+
+### 使用 agent 層級方法
+
+```ts
+import { readFile } from "fs/promises";
+
+const fileData = await readFile("/path/to/report.pdf");
+const result = await agent.uploadFile(
+  conversationId,
+  new Uint8Array(fileData),
+  "report.pdf",
+  "application/pdf" // optional — auto-detected from file extension
+);
+
+console.log(result.url);      // Public URL of the uploaded file
+console.log(result.fileName);  // "report.pdf"
+console.log(result.fileType);  // "application/pdf"
+console.log(result.fileSize);  // Size in bytes
+```
+
+### 使用 task 便利方法
+
+在 task 處理函式中，你可以使用 `task.uploadFile()`，它會自動填入 `conversationId`：
+
+```ts
+agent.onTask(async (task) => {
+  const imageData = await generateChart();
+  const result = await task.uploadFile(
+    new Uint8Array(imageData),
+    "chart.png",
+    "image/png"
+  );
+  task.sendComplete(`Here's your chart: ![Chart](${result.url})`);
+});
+```
+
+### 圖片自動上傳
+
+當你的 Agent 傳送的回應中包含帶有**本地檔案路徑**的 markdown 圖片語法時，SDK 會自動上傳該檔案並將路徑替換為上傳後的 URL：
+
+```ts
+// The SDK detects the local path, uploads the file, and replaces it with a URL
+task.sendComplete("Here's the screenshot: ![Screenshot](/tmp/screenshot.png)");
+// Sent as: "Here's the screenshot: ![Screenshot](https://r2.example.com/uploaded-url.png)"
+```
+
+此功能僅適用於 markdown 圖片語法（`![alt](path)`）。純文字路徑如 `"The file is at /tmp/screenshot.png"` **不會**被自動上傳。
+
+支援的圖片格式：`.jpg`、`.jpeg`、`.png`、`.gif`、`.webp`。
+
+## 對話歷史
+
+Agent 可以擷取對話中的先前訊息，為回應建構上下文。
+
+### 使用 agent 層級方法
+
+```ts
+const history = await agent.fetchHistory(conversationId, {
+  limit: 20,        // Number of messages to fetch (default varies by server)
+  before: messageId, // Fetch messages before this message ID
+  after: messageId,  // Fetch messages after this message ID
+  around: messageId, // Fetch messages around this message ID
+});
+
+console.log(history.messages);   // Array of message objects
+console.log(history.hasMore);    // Whether there are more messages
+console.log(history.nextCursor); // Cursor for the next page
+```
+
+### 使用 task 便利方法
+
+在 task 處理函式中，`task.fetchHistory()` 會自動填入 `conversationId`：
+
+```ts
+agent.onTask(async (task) => {
+  const history = await task.fetchHistory({ limit: 10 });
+  // Use history.messages to build context for your LLM
+  task.sendComplete("I've reviewed the conversation history.");
+});
+```
+
+### 內嵌歷史紀錄
+
+task 上下文還包含一個 `history` 屬性，其中包含伺服器預先內嵌的近期訊息。這在不需要額外 API 呼叫就能快速取得上下文時非常有用：
+
+```ts
+agent.onTask(async (task) => {
+  if (task.history && task.history.length > 0) {
+    console.log("Recent messages:", task.history);
+  }
+});
+```
+
+## 筆記
+
+筆記是附加在對話上的持久化文件。Agent 可以建立、讀取、更新和刪除筆記——適合用來儲存待辦清單、摘要或任何結構化資料。
+
+```ts
+// List all notes in a conversation
+const { notes, hasMore, nextCursor } = await agent.listNotes(conversationId, {
+  limit: 10,
+  before: cursor, // Pagination cursor
+});
+
+// Create a note
+const note = await agent.createNote(conversationId, {
+  title: "Meeting Summary",
+  content: "Key decisions:\n- Launch date: March 15\n- Budget: $50k",
+});
+
+// Update a note (only notes created by the agent)
+await agent.updateNote(conversationId, note.id, {
+  content: "Updated content here",
+});
+
+// Delete a note (only notes created by the agent)
+await agent.deleteNote(conversationId, note.id);
+```
+
+**重要：** Agent 只能更新或刪除自己建立的筆記。嘗試修改使用者建立的筆記將會產生錯誤。
 
 ## 技能
 
@@ -93,6 +265,39 @@ const agent = new ArinovaAgent({
 ```
 
 當使用者輸入 `/translate Hello world` 時，你的 Agent 會收到一個 `content` 為 `"Hello world"` 的任務。技能的後設資料會在驗證階段傳送到伺服器，並在 UI 中顯示為可用指令。
+
+## 任務取消
+
+使用者可以取消進行中的任務。當這種情況發生時，伺服器會發送一個 `cancel_task` 事件，SDK 會透過 `AbortSignal` 中止該任務。
+
+你的 Agent 可以透過 `task.signal` 屬性監聽取消事件：
+
+```ts
+agent.onTask(async (task) => {
+  // Check if cancelled before starting expensive work
+  if (task.signal.aborted) return;
+
+  // Pass the signal to fetch calls or other async operations
+  const response = await fetch("https://api.example.com/slow", {
+    signal: task.signal,
+  });
+
+  // Listen for cancellation during long operations
+  task.signal.addEventListener("abort", () => {
+    console.log("Task was cancelled by the user");
+  });
+
+  task.sendComplete("Done!");
+});
+```
+
+當任務被取消時，SDK 會自動向伺服器傳送一個錯誤回應（`"cancelled"`）並清除心跳計時器。你不需要手動呼叫 `sendError()`。
+
+## 任務心跳
+
+SDK 在處理任務期間會自動定期向伺服器發送心跳訊息（每 60 秒一次）。這告訴伺服器你的 Agent 仍然存活且正在處理該任務。
+
+心跳會在任務完成、失敗或被取消時自動停止。無需額外設定。
 
 ## 保活機制
 

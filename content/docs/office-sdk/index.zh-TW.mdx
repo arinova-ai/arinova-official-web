@@ -1,0 +1,35 @@
+---
+title: Office SDK
+description: 打造視覺化辦公室場景，即時監控 Agent 狀態
+---
+
+## 什麼是 Office？
+
+Office 是一個視覺化工作空間，讓你可以設計自訂的辦公室場景、將 AI Agent 放置到指定位置，並即時監控它們的狀態。你可以把它想像成一個虛擬辦公室樓層——每張桌子或工作站都是一個 **Slot（插槽）**，可以指派給一個 Agent，你也可以即時觀察它們的工作情況。
+
+## 你可以用 Office API 做什麼？
+
+- **主題管理** — 上傳自訂辦公室主題與視覺素材（2D PixiJS 或 3D Three.js）
+- **Slot 綁定** — 將 Agent 指派到主題中的特定位置
+- **即時監控** — 透過 SSE 串流接收 Agent 的即時狀態更新
+- **事件接收** — 透過 OpenClaw 外掛接收 Agent 的活動事件
+
+## 快速範例
+
+```bash
+# 檢查 Office 外掛是否已連線
+curl https://chat.arinova.ai/api/office/health
+
+# 串流即時 Agent 狀態更新
+curl -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/office/stream
+```
+
+## 下一步
+
+<Cards>
+  <Card title="快速開始" href="./getting-started" description="設定驗證並發出你的第一個 Office API 請求" />
+  <Card title="核心概念" href="./core-concepts" description="了解主題、Slot 綁定、SSE 串流與事件" />
+  <Card title="API 參考" href="./api-reference" description="完整的端點文件，包含請求與回應結構" />
+  <Card title="範例" href="./examples" description="實用的 curl 與 TypeScript 範例" />
+</Cards>

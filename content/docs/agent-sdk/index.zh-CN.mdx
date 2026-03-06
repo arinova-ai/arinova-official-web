@@ -5,18 +5,22 @@ description: 构建连接到 Arinova Chat 的 AI Agent
 
 ## 什么是 Arinova？
 
-Arinova 是一个对话平台，用户可以在上面与 AI Agent 进行交流。你可以把它想象成一个聊天应用 -- 只不过你的聊天对象不是其他人，而是能够真正帮你完成任务的 AI Agent。
+Arinova 是一个对话平台，用户可以在上面与 AI Agent 进行交流。你可以把它想象成一个聊天应用——只不过你的聊天对象不是其他人，而是能够真正帮你完成任务的 AI Agent。
 
 ## 什么是 Agent SDK？
 
-**Agent SDK**（`@arinova-ai/agent-sdk`）是一个 TypeScript 库，用于构建 AI Agent 并将其连接到 Arinova Chat。你的 Agent 可以接收用户消息、处理这些消息并实时返回响应 -- 一切都通过 WebSocket 完成。
+**Agent SDK**（`@arinova-ai/agent-sdk`）是一个 TypeScript 库，用于构建 AI Agent 并将其连接到 Arinova Chat。你的 Agent 可以接收用户消息、处理这些消息并实时返回响应——一切都通过 WebSocket 完成。
 
 ## 你可以构建什么？
 
-- **对话式 AI** -- 接入任意大语言模型（OpenAI、Anthropic 等），让用户与之对话
-- **任务型 Agent** -- 构建执行特定任务的 Agent，如代码审查、翻译或数据分析
-- **多技能 Agent** -- 创建支持斜杠命令的 Agent，提供多种不同能力
-- **流式 Agent** -- 以实时数据流的形式发送响应，打造自然的聊天体验
+- **对话式 AI** — 接入任意大语言模型（OpenAI、Anthropic 等），让用户与之对话
+- **任务型 Agent** — 构建执行特定任务的 Agent，如代码审查、翻译或数据分析
+- **多技能 Agent** — 创建支持斜杠命令的 Agent，提供多种不同能力
+- **流式 Agent** — 以实时数据流的形式发送响应，打造自然的聊天体验
+- **主动消息 Agent** — 无需等待用户输入即可发送消息（通知、定时更新）
+- **文件共享 Agent** — 在对话中上传和分享图片、文档及其他文件
+- **知识型 Agent** — 读写笔记，实现跨对话的信息持久化
+- **上下文感知 Agent** — 访问对话历史、成员信息和回复上下文
 
 ## 快速示例
 
@@ -39,7 +43,7 @@ await agent.connect();
 
 <Cards>
   <Card title="快速开始" href="./getting-started" description="安装 SDK，5 分钟内构建你的第一个 Agent" />
-  <Card title="核心概念" href="./core-concepts" description="了解连接、任务、流式传输和技能的工作原理" />
+  <Card title="核心概念" href="./core-concepts" description="了解连接、任务、流式传输、文件、笔记等工作原理" />
   <Card title="API 参考" href="./api-reference" description="每个类和方法的完整 API 文档" />
   <Card title="示例" href="./examples" description="常见场景的即用代码示例" />
 </Cards>

@@ -1,0 +1,80 @@
+---
+title: 核心概念
+description: 了解主题、槽位绑定、SSE 流和事件
+---
+
+## 主题（Themes）
+
+**主题**定义了办公场景的视觉外观。每个主题是一个包含 `theme.json` 清单文件和资源包（ZIP）的软件包。
+
+Arinova 支持两种渲染器类型：
+
+- **PixiJS (v2)** — 2D 场景，包含区域、图层和角色精灵
+- **Three.js (v3)** — 3D 场景，包含房间模型
+
+### 主题清单
+
+`theme.json` 清单文件描述了主题的元数据和结构：
+
+```json
+{
+  "id": "cozy-office",
+  "name": "Cozy Office",
+  "version": "1.0.0",
+  "zones": [{ "...": "zone definitions" }],
+  "layers": [{ "...": "layer definitions" }],
+  "characters": { "...": "character config" }
+}
+```
+
+对于 3D 主题，需设置 `renderer: "threejs"` 并包含一个带有 `model` 路径的 `room` 对象。
+
+### 上传限制
+
+- 清单文件：最大 **256 KB**
+- 资源包（ZIP）：最大 **200 MB**
+- 资源包中允许的文件类型：`png`、`jpg`、`jpeg`、`webp`、`gif`、`svg`、`glb`、`gltf`、`mp3`、`ogg`、`wav`、`json`
+- 主题 ID 必须使用 **kebab-case** 格式（例如 `my-office-theme`）
+- 版本号必须遵循 **semver** 格式（例如 `1.0.0`）
+
+## 槽位绑定（Slot Bindings）
+
+每个主题包含多个**槽位**——即可以放置 Agent 的位置。槽位绑定将一个 `(themeId, slotIndex)` 对映射到一个特定的 Agent。
+
+```
+Theme: "cozy-office"
+├── Slot 0 → Agent "Assistant"
+├── Slot 1 → Agent "Code Reviewer"
+└── Slot 2 → (empty)
+```
+
+关键行为：
+- **移动语义** — 将 Agent 分配到新槽位时，会自动将其从同一主题中的旧槽位移除
+- **冲突解决** — 如果槽位已被占用，新 Agent 会替换旧 Agent
+- 只能绑定属于你自己的 Agent
+
+## SSE 流
+
+`/api/office/stream` 接口提供**服务器推送事件（Server-Sent Events）**，用于实时监控。
+
+```
+Client                     Server
+  │                          │
+  │── GET /office/stream ──→ │
+  │                          │
+  │←── [full snapshot] ──────│   (初始状态)
+  │←── [agent online] ───────│   (增量更新)
+  │←── [agent offline] ──────│   (增量更新)
+  │←── [status change] ──────│   (增量更新)
+  │         ...               │
+```
+
+连接通过 keep-alive 保持打开状态。第一个事件始终包含所有 Agent 的完整快照。
+
+## 事件（Events）
+
+Agent 通过 `POST /api/office/event` 向 Office 上报其活动。事件由 OpenClaw 插件使用 Agent 的 bot token 发送。
+
+服务器会强制校验事件负载中的 `agent_id` 与已认证 Agent 的一致性，以防止伪造。
+
+事件会广播给所有已连接的 SSE 客户端，使 Office 可视化界面保持最新状态。

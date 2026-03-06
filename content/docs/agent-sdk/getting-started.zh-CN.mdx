@@ -65,13 +65,27 @@ npx tsx agent.ts
 
 ## 刚才发生了什么？
 
-1. **`new ArinovaAgent()`** -- 使用服务器地址和 Bot Token 创建了一个 Agent 实例
-2. **`agent.onTask()`** -- 注册了一个处理函数，每当用户向你的 Agent 发送消息时就会调用它
-3. **`task.sendComplete()`** -- 将最终响应发送回用户
-4. **`agent.connect()`** -- 通过 WebSocket 连接到 Arinova Chat 并完成身份认证
+1. **`new ArinovaAgent()`** — 使用服务器地址和 Bot Token 创建了一个 Agent 实例
+2. **`agent.onTask()`** — 注册了一个处理函数，每当用户向你的 Agent 发送消息时就会调用它
+3. **`task.sendComplete()`** — 将最终响应发送回用户
+4. **`agent.connect()`** — 通过 WebSocket 连接到 Arinova Chat 并完成身份认证
+
+## 不止于 Echo
+
+Echo Bot 只是最基础的示例。SDK 还支持更多功能：
+
+- **流式响应** — 在大语言模型生成内容时，实时分块发送文本
+- **主动消息** — 无需等待用户输入即可发送消息
+- **文件上传** — 向对话中上传图片和文档
+- **对话历史** — 获取之前的消息以构建上下文
+- **笔记** — 在对话中创建、读取、更新和删除持久化笔记
+- **丰富的任务上下文** — 访问发送者信息、对话成员、回复上下文和附件
+- **任务取消** — 优雅地处理用户取消请求的情况
+
+在[核心概念](./core-concepts)中了解所有这些功能，或直接查看 [API 参考](./api-reference)和[示例](./examples)。
 
 ## 下一步
 
-- 学习[核心概念](./core-concepts)，了解流式传输和技能等功能
+- 学习[核心概念](./core-concepts)，了解流式传输、文件上传、笔记等功能
 - 查阅 [API 参考](./api-reference)，了解所有可用方法
 - 浏览[示例](./examples)，了解更多高级用法

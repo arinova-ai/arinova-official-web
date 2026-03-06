@@ -1,0 +1,80 @@
+---
+title: 核心概念
+description: 了解主題、Slot 綁定、SSE 串流與事件
+---
+
+## 主題
+
+**主題**定義了辦公室場景的視覺外觀。每個主題是一個包含 `theme.json` 設定清單與素材包（ZIP）的套件。
+
+Arinova 支援兩種渲染器類型：
+
+- **PixiJS (v2)** — 2D 場景，包含區域、圖層與角色精靈圖
+- **Three.js (v3)** — 3D 場景，包含房間模型
+
+### 主題設定清單
+
+`theme.json` 設定清單描述了主題的中繼資料與結構：
+
+```json
+{
+  "id": "cozy-office",
+  "name": "Cozy Office",
+  "version": "1.0.0",
+  "zones": [{ "...": "zone definitions" }],
+  "layers": [{ "...": "layer definitions" }],
+  "characters": { "...": "character config" }
+}
+```
+
+若為 3D 主題，請設定 `renderer: "threejs"` 並加入包含 `model` 路徑的 `room` 物件。
+
+### 上傳限制
+
+- 設定清單：最大 **256 KB**
+- 素材包（ZIP）：最大 **200 MB**
+- 素材包中允許的檔案類型：`png`、`jpg`、`jpeg`、`webp`、`gif`、`svg`、`glb`、`gltf`、`mp3`、`ogg`、`wav`、`json`
+- 主題 ID 必須使用 **kebab-case** 格式（例如 `my-office-theme`）
+- 版本號必須遵循 **semver** 格式（例如 `1.0.0`）
+
+## Slot 綁定
+
+每個主題有多個 **Slot（插槽）**——即可放置 Agent 的位置。Slot 綁定將 `(themeId, slotIndex)` 對應到特定的 Agent。
+
+```
+Theme: "cozy-office"
+├── Slot 0 → Agent "Assistant"
+├── Slot 1 → Agent "Code Reviewer"
+└── Slot 2 → (empty)
+```
+
+主要行為：
+- **移動語意** — 將 Agent 指派到新的 Slot 時，會自動將其從同一主題中的原 Slot 移除
+- **衝突處理** — 如果 Slot 已被佔用，新的 Agent 會取代原有的
+- 你只能綁定自己擁有的 Agent
+
+## SSE 串流
+
+`/api/office/stream` 端點提供 **Server-Sent Events** 以進行即時監控。
+
+```
+Client                     Server
+  │                          │
+  │── GET /office/stream ──→ │
+  │                          │
+  │←── [full snapshot] ──────│   (初始狀態)
+  │←── [agent online] ───────│   (增量更新)
+  │←── [agent offline] ──────│   (增量更新)
+  │←── [status change] ──────│   (增量更新)
+  │         ...               │
+```
+
+連線會透過 keep-alive 保持開啟。第一個事件一定包含所有 Agent 的完整快照。
+
+## 事件
+
+Agent 透過 `POST /api/office/event` 向 Office 回報其活動。事件由 OpenClaw 外掛使用 Agent 的 bot token 發送。
+
+伺服器會強制將事件內容中的 `agent_id` 覆寫為已驗證 Agent 的 ID，以防止偽造。
+
+事件會廣播給所有已連線的 SSE 用戶端，讓辦公室的視覺化畫面保持最新狀態。

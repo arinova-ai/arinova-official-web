@@ -65,17 +65,205 @@ agent.onTask(async (task: TaskContext) => {
 | `"disconnected"` | `() => void` | 连接关闭时触发 |
 | `"error"` | `(error: Error) => void` | 认证失败、连接错误或解析错误时触发 |
 
+#### `agent.sendMessage(conversationId, content)`
+
+向对话发送主动消息。如果 WebSocket 已连接则使用 WebSocket，否则降级为 HTTP POST。
+
+```ts
+await agent.sendMessage("conv-123", "Hello from your agent!");
+```
+
+**参数：**
+- `conversationId`（`string`）— 要发送消息的对话 ID
+- `content`（`string`）— 消息文本（支持 Markdown）
+
+**返回值：** `Promise<void>`
+
+**异常：** 如果 HTTP 降级失败（非 2xx 响应），则抛出 `Error`。
+
+#### `agent.uploadFile(conversationId, file, fileName, fileType?)`
+
+通过 Agent 上传接口将文件上传到 R2 云存储。
+
+```ts
+const result = await agent.uploadFile(
+  "conv-123",
+  new Uint8Array(fileBuffer),
+  "report.pdf",
+  "application/pdf"
+);
+console.log(result.url); // "https://..."
+```
+
+**参数：**
+- `conversationId`（`string`）— 该上传所属的对话 ID
+- `file`（`Buffer | Uint8Array`）— 文件数据
+- `fileName`（`string`）— 原始文件名（用于扩展名检测）
+- `fileType`（`string`，可选）— MIME 类型。如果省略则从文件扩展名自动检测
+
+**返回值：** `Promise<UploadResult>`
+
+```ts
+interface UploadResult {
+  url: string;       // Public URL of the uploaded file
+  fileName: string;  // File name
+  fileType: string;  // MIME type
+  fileSize: number;  // Size in bytes
+}
+```
+
+**支持的 MIME 自动检测：** `.jpg`/`.jpeg`（image/jpeg）、`.png`（image/png）、`.gif`（image/gif）、`.webp`（image/webp）、`.pdf`（application/pdf）、`.txt`（text/plain）、`.csv`（text/csv）、`.json`（application/json）。其他扩展名默认为 `application/octet-stream`。
+
+#### `agent.fetchHistory(conversationId, options?)`
+
+获取对话消息历史。
+
+```ts
+const result = await agent.fetchHistory("conv-123", {
+  limit: 20,
+  before: "msg-456",
+});
+```
+
+**参数：**
+- `conversationId`（`string`）— 要获取消息的对话 ID
+- `options`（`FetchHistoryOptions`，可选）— 分页选项
+
+```ts
+interface FetchHistoryOptions {
+  before?: string;  // Fetch messages before this message ID
+  after?: string;   // Fetch messages after this message ID
+  around?: string;  // Fetch messages around this message ID
+  limit?: number;   // Max number of messages to return
+}
+```
+
+**返回值：** `Promise<FetchHistoryResult>`
+
+```ts
+interface FetchHistoryResult {
+  messages: Message[];  // Array of message objects
+  hasMore: boolean;     // Whether more messages exist
+  nextCursor: string;   // Cursor for fetching the next page
+}
+```
+
+#### `agent.listNotes(conversationId, options?)`
+
+列出对话中的笔记。
+
+```ts
+const result = await agent.listNotes("conv-123", { limit: 10 });
+```
+
+**参数：**
+- `conversationId`（`string`）— 要列出笔记的对话 ID
+- `options`（`ListNotesOptions`，可选）— 分页选项
+
+```ts
+interface ListNotesOptions {
+  before?: string;  // Pagination cursor
+  limit?: number;   // Max number of notes to return
+}
+```
+
+**返回值：** `Promise<ListNotesResult>`
+
+```ts
+interface ListNotesResult {
+  notes: Note[];       // Array of note objects
+  hasMore: boolean;    // Whether more notes exist
+  nextCursor: string;  // Cursor for fetching the next page
+}
+```
+
+#### `agent.createNote(conversationId, body)`
+
+在对话中创建新笔记。
+
+```ts
+const note = await agent.createNote("conv-123", {
+  title: "Meeting Notes",
+  content: "Key decisions:\n- Launch on March 15",
+});
+```
+
+**参数：**
+- `conversationId`（`string`）— 要创建笔记的对话 ID
+- `body`（`CreateNoteBody`）— 笔记标题和内容
+
+```ts
+interface CreateNoteBody {
+  title: string;     // Note title
+  content?: string;  // Note content (markdown supported)
+}
+```
+
+**返回值：** `Promise<Note>` — 创建的笔记对象。
+
+#### `agent.updateNote(conversationId, noteId, body)`
+
+更新现有笔记。**Agent 只能更新自己创建的笔记。**
+
+```ts
+await agent.updateNote("conv-123", "note-456", {
+  content: "Updated content",
+});
+```
+
+**参数：**
+- `conversationId`（`string`）— 笔记所属的对话 ID
+- `noteId`（`string`）— 要更新的笔记 ID
+- `body`（`UpdateNoteBody`）— 要更新的字段
+
+```ts
+interface UpdateNoteBody {
+  title?: string;    // New title (optional)
+  content?: string;  // New content (optional)
+}
+```
+
+**返回值：** `Promise<Note>` — 更新后的笔记对象。
+
+**异常：** 如果该笔记不是由 Agent 创建的，则抛出 `Error`。
+
+#### `agent.deleteNote(conversationId, noteId)`
+
+删除笔记。**Agent 只能删除自己创建的笔记。**
+
+```ts
+await agent.deleteNote("conv-123", "note-456");
+```
+
+**参数：**
+- `conversationId`（`string`）— 笔记所属的对话 ID
+- `noteId`（`string`）— 要删除的笔记 ID
+
+**返回值：** `Promise<void>`
+
+**异常：** 如果该笔记不是由 Agent 创建的，则抛出 `Error`。
+
 ---
 
 ## TaskContext
 
-传递给 `onTask` 处理函数的对象。
+传递给 `onTask` 处理函数的对象。包含传入消息的信息以及用于响应的方法。
+
+### 属性
 
 | Property | Type | Description |
 |---|---|---|
 | `taskId` | `string` | 服务器分配的唯一任务 ID |
 | `conversationId` | `string` | 该任务所属的对话 ID |
 | `content` | `string` | 用户发送的消息文本 |
+| `conversationType` | `string` | 对话类型：`"dm"`、`"group"` 或 `"community"` |
+| `senderUserId` | `string` | 发送消息的用户 ID |
+| `senderUsername` | `string` | 发送者的用户名 |
+| `members` | `Member[]` | 对话成员数组 |
+| `replyTo` | `ReplyContext \| undefined` | 如果消息是回复另一条消息，则包含回复上下文 |
+| `history` | `Message[] \| undefined` | 服务器嵌入的近期消息历史 |
+| `attachments` | `Attachment[] \| undefined` | 传入消息上的文件附件 |
+| `signal` | `AbortSignal` | 用于任务取消的 AbortSignal — 当用户取消任务时会被中止 |
 
 ### 方法
 
@@ -88,9 +276,9 @@ task.sendChunk("Processing...\n");
 ```
 
 **参数：**
-- `chunk`（`string`）-- 要发送的文本分块
+- `chunk`（`string`）— 要发送的文本分块
 
-#### `task.sendComplete(content)`
+#### `task.sendComplete(content, options?)`
 
 标记任务完成，并附带完整响应内容。
 
@@ -98,8 +286,23 @@ task.sendChunk("Processing...\n");
 task.sendComplete("Here is your answer.");
 ```
 
+带提及功能：
+
+```ts
+task.sendComplete("Here's the info you requested!", {
+  mentions: ["user-id-1", "user-id-2"],
+});
+```
+
 **参数：**
-- `content`（`string`）-- 完整的响应文本
+- `content`（`string`）— 完整的响应文本
+- `options`（`SendCompleteOptions`，可选）— 附加选项
+
+```ts
+interface SendCompleteOptions {
+  mentions?: string[];  // Array of user IDs to @mention
+}
+```
 
 #### `task.sendError(error)`
 
@@ -110,7 +313,39 @@ task.sendError("Something went wrong.");
 ```
 
 **参数：**
-- `error`（`string`）-- 错误信息
+- `error`（`string`）— 错误信息
+
+#### `task.uploadFile(file, fileName, fileType?)`
+
+便捷方法，将文件上传到当前对话。等价于调用 `agent.uploadFile(task.conversationId, ...)`。
+
+```ts
+const result = await task.uploadFile(
+  new Uint8Array(imageData),
+  "chart.png",
+  "image/png"
+);
+```
+
+**参数：**
+- `file`（`Buffer | Uint8Array`）— 文件数据
+- `fileName`（`string`）— 原始文件名
+- `fileType`（`string`，可选）— MIME 类型（如果省略则从扩展名自动检测）
+
+**返回值：** `Promise<UploadResult>`
+
+#### `task.fetchHistory(options?)`
+
+便捷方法，获取当前对话的消息历史。等价于调用 `agent.fetchHistory(task.conversationId, ...)`。
+
+```ts
+const history = await task.fetchHistory({ limit: 10 });
+```
+
+**参数：**
+- `options`（`FetchHistoryOptions`，可选）— 分页选项
+
+**返回值：** `Promise<FetchHistoryResult>`
 
 ---
 
@@ -169,4 +404,97 @@ type AgentEvent = "connected" | "disconnected" | "error";
 type AgentEventListener<T extends AgentEvent> = T extends "error"
   ? (error: Error) => void
   : () => void;
+```
+
+### SendCompleteOptions
+
+`task.sendComplete()` 的选项。
+
+```ts
+interface SendCompleteOptions {
+  mentions?: string[];  // User IDs to @mention in the response
+}
+```
+
+### FetchHistoryOptions
+
+获取消息历史的分页选项。
+
+```ts
+interface FetchHistoryOptions {
+  before?: string;  // Message ID — fetch messages before this
+  after?: string;   // Message ID — fetch messages after this
+  around?: string;  // Message ID — fetch messages around this
+  limit?: number;   // Maximum number of messages to return
+}
+```
+
+### FetchHistoryResult
+
+获取消息历史的返回结果。
+
+```ts
+interface FetchHistoryResult {
+  messages: Message[];
+  hasMore: boolean;
+  nextCursor: string;
+}
+```
+
+### ListNotesOptions
+
+列出笔记的分页选项。
+
+```ts
+interface ListNotesOptions {
+  before?: string;  // Pagination cursor
+  limit?: number;   // Maximum number of notes to return
+}
+```
+
+### ListNotesResult
+
+列出笔记的返回结果。
+
+```ts
+interface ListNotesResult {
+  notes: Note[];
+  hasMore: boolean;
+  nextCursor: string;
+}
+```
+
+### CreateNoteBody
+
+创建笔记的请求体。
+
+```ts
+interface CreateNoteBody {
+  title: string;
+  content?: string;
+}
+```
+
+### UpdateNoteBody
+
+更新笔记的请求体。
+
+```ts
+interface UpdateNoteBody {
+  title?: string;
+  content?: string;
+}
+```
+
+### UploadResult
+
+文件上传的返回结果。
+
+```ts
+interface UploadResult {
+  url: string;       // Public URL of the uploaded file
+  fileName: string;  // File name as stored
+  fileType: string;  // MIME type
+  fileSize: number;  // Size in bytes
+}
 ```

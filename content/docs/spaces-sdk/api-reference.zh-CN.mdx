@@ -1,0 +1,695 @@
+---
+title: API 参考
+description: Spaces、Communities、Official 和 Lounge API 的完整端点文档
+---
+
+## Spaces
+
+### GET /api/spaces
+
+浏览公开空间，支持分页和筛选。
+
+**查询参数：**
+
+| 参数 | 类型 | 默认值 | 描述 |
+|---|---|---|---|
+| `search` | `string` | — | 按名称搜索 |
+| `category` | `string` | — | 按分类筛选 |
+| `page` | `number` | `1` | 页码 |
+| `limit` | `number` | `20` | 每页结果数（最大 50） |
+
+**响应 (200)：**
+
+```json
+{
+  "spaces": [
+    {
+      "id": "uuid",
+      "ownerId": "uuid",
+      "name": "My Space",
+      "description": "...",
+      "category": "gaming",
+      "tags": ["fun", "multiplayer"],
+      "definition": {},
+      "isPublic": true,
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ],
+  "total": 100,
+  "page": 1,
+  "totalPages": 5
+}
+```
+
+---
+
+### POST /api/spaces
+
+创建新空间。需要 session 认证。
+
+**请求体：**
+
+| 字段 | 类型 | 必填 | 描述 |
+|---|---|---|---|
+| `name` | `string` | 是 | 空间名称 |
+| `description` | `string` | 否 | 描述 |
+| `category` | `string` | 否 | 分类标签 |
+| `tags` | `string[]` | 否 | 标签数组 |
+| `definition` | `object` | 否 | 自定义配置（可包含 `iframeUrl`） |
+| `isPublic` | `boolean` | 否 | 是否公开可见 |
+
+**验证：** 如果提供了 `definition.iframeUrl`，必须是有效的 HTTPS URL。
+
+**响应 (201)：** 创建的 SpaceRow。
+
+---
+
+### GET /api/spaces/\{id\}
+
+获取空间详情，包含所有者信息和会话。需要 session 认证。
+
+**响应 (200)：**
+
+```json
+{
+  "id": "uuid",
+  "ownerId": "uuid",
+  "name": "My Space",
+  "description": "...",
+  "category": "gaming",
+  "tags": [],
+  "definition": {},
+  "isPublic": true,
+  "createdAt": "...",
+  "updatedAt": "...",
+  "owner": { "id": "uuid", "name": "Alice", "image": "https://..." },
+  "sessions": []
+}
+```
+
+---
+
+### DELETE /api/spaces/\{id\}
+
+删除空间。需要 session 认证。仅所有者可以删除。
+
+**响应：** `204 No Content`
+
+---
+
+### POST /api/spaces/\{id\}/sessions
+
+在空间中创建会话。需要 session 认证。创建者自动加入为第一个参与者。
+
+**响应 (201)：**
+
+```json
+{
+  "id": "session-uuid",
+  "playgroundId": "space-uuid",
+  "status": "waiting",
+  "participantCount": 1
+}
+```
+
+---
+
+### GET /api/spaces/\{id\}/sessions
+
+列出空间的所有会话。需要 session 认证。
+
+**响应 (200)：** 包含参与者数量的会话行数组。
+
+---
+
+### POST /api/spaces/\{id\}/sessions/\{session_id\}/join
+
+加入会话。需要 session 认证。如果已是参与者，则重新连接。
+
+**请求体（可选）：**
+
+| 字段 | 类型 | 描述 |
+|---|---|---|
+| `agentId` | `string` | 以智能体身份加入的 UUID |
+| `role` | `string` | 参与者角色 |
+| `controlMode` | `string` | 控制模式 |
+
+**响应 (200/201)：**
+
+```json
+{
+  "id": "participant-uuid",
+  "isConnected": true
+}
+```
+
+---
+
+### POST /api/spaces/\{id\}/sessions/\{session_id\}/leave
+
+离开会话。需要 session 认证。将参与者标记为已断开。
+
+**响应：** `204 No Content`
+
+---
+
+## Communities
+
+### GET /api/communities
+
+浏览活跃社区。无需认证。
+
+**查询参数：**
+
+| 参数 | 类型 | 默认值 | 描述 |
+|---|---|---|---|
+| `type` | `string` | — | 按 `official` 或 `club` 筛选 |
+| `category` | `string` | — | 按分类筛选 |
+| `search` | `string` | — | 按名称搜索 |
+| `page` | `number` | `1` | 页码 |
+| `limit` | `number` | `20` | 每页结果数（最大 50） |
+
+**响应 (200)：**
+
+```json
+{
+  "communities": [],
+  "total": 0
+}
+```
+
+---
+
+### POST /api/communities
+
+创建社区。需要 session 认证。
+
+**请求体：**
+
+| 字段 | 类型 | 必填 | 默认值 | 描述 |
+|---|---|---|---|---|
+| `name` | `string` | 是 | — | 社区名称（1-100 字符） |
+| `description` | `string` | 否 | — | 描述 |
+| `type` | `string` | 否 | `"club"` | `"official"` 或 `"club"` |
+| `joinFee` | `number` | 否 | `0` | 一次性加入费 |
+| `monthlyFee` | `number` | 否 | `0` | 月度订阅费 |
+| `agentCallFee` | `number` | 否 | `0` | 每次智能体交互费用 |
+| `category` | `string` | 否 | — | 分类标签 |
+| `avatarUrl` | `string` | 否 | — | 社区头像 URL |
+| `csMode` | `string` | 否 | `"ai_only"` | 客服模式：`"ai_only"`、`"human_only"`、`"hybrid"` |
+| `defaultAgentListingId` | `string` | 否 | — | 默认智能体列表 UUID |
+
+**响应 (201)：**
+
+```json
+{ "id": "community-uuid" }
+```
+
+---
+
+### GET /api/communities/\{id\}
+
+获取社区详情。无需认证。
+
+**响应 (200)：** 包含所有字段的完整社区行。
+
+---
+
+### PUT /api/communities/\{id\}
+
+更新社区详情。需要 session 认证。仅创建者可操作。
+
+**请求体：** 与 POST 相同的字段（均为可选）。费用必须为非负数。
+
+**响应 (200)：** `{ "success": true }`
+
+---
+
+### DELETE /api/communities/\{id\}
+
+软删除社区（将状态设为 `archived`）。需要 session 认证。仅创建者可操作。
+
+**响应 (200)：** `{ "success": true }`
+
+---
+
+### POST /api/communities/\{id\}/join
+
+加入社区。需要 session 认证。如适用，会收取加入费和月费。
+
+**响应 (200)：** `{ "success": true }`
+
+**错误：**
+- `402 Payment Required` — 余额不足
+- `409 Conflict` — 已是成员
+
+---
+
+### POST /api/communities/\{id\}/leave
+
+离开社区。需要 session 认证。创建者不能离开。
+
+**响应 (200)：** `{ "success": true }`
+
+---
+
+### GET /api/communities/\{id\}/members
+
+列出社区成员。无需认证。
+
+**响应 (200)：**
+
+```json
+{
+  "members": [
+    {
+      "id": "uuid",
+      "userId": "uuid",
+      "role": "creator",
+      "joinedAt": "...",
+      "subscriptionStatus": "active",
+      "userName": "Alice",
+      "userImage": "https://..."
+    }
+  ]
+}
+```
+
+---
+
+### POST /api/communities/\{id\}/agents
+
+向社区添加智能体。需要 session 认证。仅创建者可操作。
+
+**请求体：**
+
+| 字段 | 类型 | 必填 | 描述 |
+|---|---|---|---|
+| `listingId` | `string` | 是 | 智能体列表 UUID |
+
+**响应 (201)：** `{ "success": true }`
+
+---
+
+### DELETE /api/communities/\{id\}/agents/\{listing_id\}
+
+从社区移除智能体。需要 session 认证。仅创建者可操作。
+
+**响应 (200)：** `{ "success": true }`
+
+---
+
+### GET /api/communities/\{id\}/agents
+
+列出社区中的智能体。无需认证。
+
+**响应 (200)：**
+
+```json
+{
+  "agents": [
+    {
+      "id": "uuid",
+      "listingId": "uuid",
+      "agentName": "Assistant",
+      "avatarUrl": "https://...",
+      "description": "...",
+      "model": "gpt-4o",
+      "addedAt": "..."
+    }
+  ]
+}
+```
+
+---
+
+### POST /api/communities/\{id\}/messages
+
+向社区发送文字消息。需要 session 认证。必须是成员。
+
+**请求体：**
+
+| 字段 | 类型 | 必填 | 描述 |
+|---|---|---|---|
+| `content` | `string` | 是 | 消息文本（1-5000 字符） |
+
+**响应 (201)：**
+
+```json
+{
+  "id": "message-uuid",
+  "userId": "uuid",
+  "content": "Hello!",
+  "messageType": "text"
+}
+```
+
+---
+
+### POST /api/communities/\{id\}/agent-chat
+
+与社区中的 AI 智能体聊天。需要 session 认证。必须是成员。收取 `agentCallFee`。返回 SSE 流。
+
+**请求体：**
+
+| 字段 | 类型 | 必填 | 描述 |
+|---|---|---|---|
+| `content` | `string` | 是 | 用户消息 |
+| `listingId` | `string` | 是 | 智能体列表 UUID |
+
+**SSE 事件：**
+
+| 事件类型 | 字段 | 描述 |
+|---|---|---|
+| `meta` | `communityId`, `userMessageId` | 初始元数据 |
+| `chunk` | `content` | 流式响应文本 |
+| `done` | — | 流式传输完成 |
+| `audio_ready` | `audioUrl` | TTS 音频 URL（如果可用） |
+| `error` | `message` | 发生错误 |
+
+**错误：**
+- `402 Payment Required` — 余额不足
+
+---
+
+### GET /api/communities/\{id\}/messages
+
+获取社区消息历史。需要 session 认证。必须是成员。基于游标的分页。
+
+**查询参数：**
+
+| 参数 | 类型 | 默认值 | 描述 |
+|---|---|---|---|
+| `before` | `string` | — | ISO 日期时间游标（获取此时间之前的消息） |
+| `limit` | `number` | `50` | 每页结果数（最大 100） |
+
+**响应 (200)：**
+
+```json
+{
+  "messages": [
+    {
+      "id": "uuid",
+      "userId": "uuid",
+      "agentListingId": null,
+      "content": "Hello!",
+      "messageType": "text",
+      "createdAt": "...",
+      "userName": "Alice",
+      "userImage": "https://...",
+      "agentName": null,
+      "ttsAudioUrl": null
+    }
+  ]
+}
+```
+
+---
+
+### GET /api/communities/my
+
+列出当前认证用户创建的社区。需要 session 认证。
+
+**响应 (200)：** `{ "communities": [...] }`
+
+---
+
+### GET /api/communities/joined
+
+列出当前认证用户已加入的社区。需要 session 认证。
+
+**响应 (200)：** `{ "communities": [...] }`
+
+---
+
+## Official（客户服务）
+
+### POST /api/communities/\{id\}/start-chat
+
+与 Official 社区发起一对一对话。需要 session 认证。如果已有对话则复用。
+
+**响应 (200/201)：**
+
+```json
+{
+  "conversationId": "uuid",
+  "existing": false,
+  "status": "ai_active"
+}
+```
+
+初始状态取决于社区的 `csMode`：
+- `human_only` → `"waiting_human"`
+- 其他 → `"ai_active"`
+
+---
+
+### POST /api/communities/\{id\}/transfer-human
+
+请求从 AI 转接到人工客服。需要 session 认证。
+
+**响应 (200)：** `{ "status": "waiting_human" }`
+
+---
+
+### POST /api/communities/\{id\}/accept-transfer
+
+客服坐席接受转接。需要 session 认证。必须是创建者、管理员或客服坐席。
+
+**请求体：**
+
+| 字段 | 类型 | 必填 | 描述 |
+|---|---|---|---|
+| `conversationId` | `string` | 是 | 对话 UUID |
+
+**响应 (200)：** `{ "status": "human_active" }`
+
+---
+
+### POST /api/communities/\{id\}/resolve
+
+将对话标记为已解决。需要 session 认证。用户、指定客服坐席、创建者或管理员均可调用。
+
+**请求体：**
+
+| 字段 | 类型 | 必填 | 描述 |
+|---|---|---|---|
+| `conversationId` | `string` | 是 | 对话 UUID |
+
+**响应 (200)：** `{ "status": "resolved" }`
+
+---
+
+### GET /api/communities/\{id\}/cs-status
+
+获取对话的客服状态。需要 session 认证。
+
+**查询参数：**
+
+| 参数 | 类型 | 必填 | 描述 |
+|---|---|---|---|
+| `conversationId` | `string` | 是 | 对话 UUID |
+
+**响应 (200)：**
+
+```json
+{ "status": "ai_active" }
+```
+
+可能的值：`"ai_active"`、`"waiting_human"`、`"human_active"`、`"resolved"`、`"none"`
+
+---
+
+### GET /api/communities/\{id\}/cs-queue
+
+查看客服队列。需要 session 认证。必须是创建者、管理员或客服坐席。
+
+**响应 (200)：**
+
+```json
+{
+  "queue": [
+    {
+      "id": "uuid",
+      "conversationId": "uuid",
+      "userId": "uuid",
+      "status": "waiting_human",
+      "assignedCsId": null,
+      "userName": "Alice",
+      "userImage": "https://...",
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ]
+}
+```
+
+队列按优先级排序：`waiting_human` > `human_active` > `ai_active` > `resolved`。
+
+---
+
+### POST /api/communities/\{id\}/invite-cs
+
+邀请用户成为客服坐席。需要 session 认证。必须是创建者或管理员。
+
+**请求体：**
+
+| 字段 | 类型 | 必填 | 描述 |
+|---|---|---|---|
+| `userId` | `string` | 是 | 要邀请的用户 ID |
+
+**响应 (200)：** `{ "success": true }`
+
+---
+
+### POST /api/communities/\{id\}/verify
+
+提交认证请求。需要 session 认证。仅创建者可操作。
+
+**请求体：**
+
+| 字段 | 类型 | 必填 | 描述 |
+|---|---|---|---|
+| `businessName` | `string` | 否 | 企业名称 |
+| `businessRegistration` | `string` | 否 | 企业注册号 |
+| `documentsUrl` | `string` | 否 | 认证文件的 URL |
+
+**响应 (201)：**
+
+```json
+{ "requestId": "uuid" }
+```
+
+---
+
+## Lounge
+
+### POST /api/lounge
+
+创建 Lounge 社区。需要 session 认证。
+
+**请求体：**
+
+| 字段 | 类型 | 必填 | 默认值 | 描述 |
+|---|---|---|---|---|
+| `name` | `string` | 是 | — | Lounge 名称（1-100 字符） |
+| `description` | `string` | 否 | — | 描述 |
+| `avatarUrl` | `string` | 否 | — | 头像 URL |
+| `voiceSamplesUrl` | `string` | 否 | — | 用于语音克隆的语音样本 URL |
+| `freeMinutesPerDay` | `number` | 否 | `5` | 每天免费语音分钟数 |
+| `subscriptionPriceCents` | `number` | 否 | `0` | 月度订阅价格（单位：美分） |
+| `defaultAgentListingId` | `string` | 否 | — | 默认智能体列表 UUID |
+
+**响应 (201)：**
+
+```json
+{ "id": "lounge-uuid" }
+```
+
+---
+
+### GET /api/lounge/\{id\}
+
+获取 Lounge 详情。无需认证。
+
+**响应 (200)：**
+
+```json
+{
+  "id": "uuid",
+  "creatorId": "uuid",
+  "name": "My Lounge",
+  "description": "...",
+  "avatarUrl": "https://...",
+  "memberCount": 10,
+  "voiceModelId": "model-id",
+  "voiceModelStatus": "ready",
+  "voiceSamplesUrl": "https://...",
+  "freeMinutesPerDay": 5,
+  "subscriptionPriceCents": 999,
+  "defaultAgentListingId": "uuid",
+  "createdAt": "...",
+  "creatorName": "Alice",
+  "creatorImage": "https://..."
+}
+```
+
+---
+
+### POST /api/lounge/\{id\}/start-chat
+
+与 Lounge 智能体发起语音聊天会话。需要 session 认证。如果用户尚未加入社区，将自动加入。复用已有对话。
+
+**响应 (200/201)：**
+
+```json
+{
+  "conversationId": "uuid",
+  "existing": false
+}
+```
+
+---
+
+### GET /api/lounge/\{id\}/dashboard
+
+创建者仪表盘，展示 Lounge 统计数据。需要 session 认证。仅创建者可访问。
+
+**响应 (200)：**
+
+```json
+{
+  "memberCount": 42,
+  "activeSubscriptions": 15,
+  "totalConversations": 200,
+  "todayUsageMinutes": 120
+}
+```
+
+---
+
+## 管理员端点
+
+### GET /api/admin/verification-requests
+
+列出所有认证请求。需要管理员权限。
+
+**响应 (200)：**
+
+```json
+{
+  "requests": [
+    {
+      "id": "uuid",
+      "communityId": "uuid",
+      "requesterId": "uuid",
+      "businessName": "Acme Inc",
+      "businessRegistration": "12345",
+      "documentsUrl": "https://...",
+      "status": "pending",
+      "reviewerNotes": null,
+      "communityName": "Acme Official",
+      "createdAt": "...",
+      "reviewedAt": null
+    }
+  ]
+}
+```
+
+---
+
+### PUT /api/admin/verification-requests/\{id\}
+
+审核认证请求。需要管理员权限。
+
+**请求体：**
+
+| 字段 | 类型 | 必填 | 描述 |
+|---|---|---|---|
+| `status` | `string` | 是 | `"approved"` 或 `"rejected"` |
+| `reviewerNotes` | `string` | 否 | 审核备注 |
+
+**响应 (200)：** `{ "success": true }`
+
+如果批准，社区将自动标记为已认证。

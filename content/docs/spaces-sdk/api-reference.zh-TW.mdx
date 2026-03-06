@@ -1,0 +1,695 @@
+---
+title: API 參考
+description: Spaces、Communities、Official 和 Lounge API 的完整端點文件
+---
+
+## Spaces
+
+### GET /api/spaces
+
+瀏覽公開空間，支援分頁與篩選。
+
+**查詢參數：**
+
+| 參數 | 類型 | 預設值 | 說明 |
+|---|---|---|---|
+| `search` | `string` | — | 依名稱搜尋 |
+| `category` | `string` | — | 依分類篩選 |
+| `page` | `number` | `1` | 頁碼 |
+| `limit` | `number` | `20` | 每頁筆數（最多 50） |
+
+**回應 (200)：**
+
+```json
+{
+  "spaces": [
+    {
+      "id": "uuid",
+      "ownerId": "uuid",
+      "name": "My Space",
+      "description": "...",
+      "category": "gaming",
+      "tags": ["fun", "multiplayer"],
+      "definition": {},
+      "isPublic": true,
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ],
+  "total": 100,
+  "page": 1,
+  "totalPages": 5
+}
+```
+
+---
+
+### POST /api/spaces
+
+建立新空間。需要 session 驗證。
+
+**請求本體：**
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `name` | `string` | 是 | 空間名稱 |
+| `description` | `string` | 否 | 說明 |
+| `category` | `string` | 否 | 分類標籤 |
+| `tags` | `string[]` | 否 | 標籤陣列 |
+| `definition` | `object` | 否 | 自訂設定（可包含 `iframeUrl`） |
+| `isPublic` | `boolean` | 否 | 空間是否公開可見 |
+
+**驗證規則：** 若提供 `definition.iframeUrl`，必須是有效的 HTTPS URL。
+
+**回應 (201)：** 已建立的 SpaceRow。
+
+---
+
+### GET /api/spaces/\{id\}
+
+取得空間詳情，包含擁有者資訊和工作階段。需要 session 驗證。
+
+**回應 (200)：**
+
+```json
+{
+  "id": "uuid",
+  "ownerId": "uuid",
+  "name": "My Space",
+  "description": "...",
+  "category": "gaming",
+  "tags": [],
+  "definition": {},
+  "isPublic": true,
+  "createdAt": "...",
+  "updatedAt": "...",
+  "owner": { "id": "uuid", "name": "Alice", "image": "https://..." },
+  "sessions": []
+}
+```
+
+---
+
+### DELETE /api/spaces/\{id\}
+
+刪除空間。需要 session 驗證。僅擁有者可刪除。
+
+**回應：** `204 No Content`
+
+---
+
+### POST /api/spaces/\{id\}/sessions
+
+在空間中建立工作階段。需要 session 驗證。建立者會自動加入為第一位參與者。
+
+**回應 (201)：**
+
+```json
+{
+  "id": "session-uuid",
+  "playgroundId": "space-uuid",
+  "status": "waiting",
+  "participantCount": 1
+}
+```
+
+---
+
+### GET /api/spaces/\{id\}/sessions
+
+列出空間的所有工作階段。需要 session 驗證。
+
+**回應 (200)：** 含參與者計數的工作階段陣列。
+
+---
+
+### POST /api/spaces/\{id\}/sessions/\{session_id\}/join
+
+加入工作階段。需要 session 驗證。若已是參與者則重新連線。
+
+**請求本體（選填）：**
+
+| 欄位 | 類型 | 說明 |
+|---|---|---|
+| `agentId` | `string` | 以代理身份加入的 UUID |
+| `role` | `string` | 參與者角色 |
+| `controlMode` | `string` | 控制模式 |
+
+**回應 (200/201)：**
+
+```json
+{
+  "id": "participant-uuid",
+  "isConnected": true
+}
+```
+
+---
+
+### POST /api/spaces/\{id\}/sessions/\{session_id\}/leave
+
+離開工作階段。需要 session 驗證。將參與者標記為已中斷連線。
+
+**回應：** `204 No Content`
+
+---
+
+## Communities
+
+### GET /api/communities
+
+瀏覽活躍社群。無需驗證。
+
+**查詢參數：**
+
+| 參數 | 類型 | 預設值 | 說明 |
+|---|---|---|---|
+| `type` | `string` | — | 依 `official` 或 `club` 篩選 |
+| `category` | `string` | — | 依分類篩選 |
+| `search` | `string` | — | 依名稱搜尋 |
+| `page` | `number` | `1` | 頁碼 |
+| `limit` | `number` | `20` | 每頁筆數（最多 50） |
+
+**回應 (200)：**
+
+```json
+{
+  "communities": [],
+  "total": 0
+}
+```
+
+---
+
+### POST /api/communities
+
+建立社群。需要 session 驗證。
+
+**請求本體：**
+
+| 欄位 | 類型 | 必填 | 預設值 | 說明 |
+|---|---|---|---|---|
+| `name` | `string` | 是 | — | 社群名稱（1-100 字元） |
+| `description` | `string` | 否 | — | 說明 |
+| `type` | `string` | 否 | `"club"` | `"official"` 或 `"club"` |
+| `joinFee` | `number` | 否 | `0` | 一次性加入費用 |
+| `monthlyFee` | `number` | 否 | `0` | 月費訂閱 |
+| `agentCallFee` | `number` | 否 | `0` | 每次代理互動費用 |
+| `category` | `string` | 否 | — | 分類標籤 |
+| `avatarUrl` | `string` | 否 | — | 社群頭像 URL |
+| `csMode` | `string` | 否 | `"ai_only"` | 客服模式：`"ai_only"`、`"human_only"`、`"hybrid"` |
+| `defaultAgentListingId` | `string` | 否 | — | 預設代理清單 UUID |
+
+**回應 (201)：**
+
+```json
+{ "id": "community-uuid" }
+```
+
+---
+
+### GET /api/communities/\{id\}
+
+取得社群詳情。無需驗證。
+
+**回應 (200)：** 包含所有欄位的完整社群資料。
+
+---
+
+### PUT /api/communities/\{id\}
+
+更新社群詳情。需要 session 驗證。僅建立者可操作。
+
+**請求本體：** 與 POST 相同的欄位（皆為選填）。費用必須為非負數。
+
+**回應 (200)：** `{ "success": true }`
+
+---
+
+### DELETE /api/communities/\{id\}
+
+軟刪除社群（將狀態設為 `archived`）。需要 session 驗證。僅建立者可操作。
+
+**回應 (200)：** `{ "success": true }`
+
+---
+
+### POST /api/communities/\{id\}/join
+
+加入社群。需要 session 驗證。若適用，會收取加入費 + 月費。
+
+**回應 (200)：** `{ "success": true }`
+
+**錯誤：**
+- `402 Payment Required` — 餘額不足
+- `409 Conflict` — 已是成員
+
+---
+
+### POST /api/communities/\{id\}/leave
+
+離開社群。需要 session 驗證。建立者無法離開。
+
+**回應 (200)：** `{ "success": true }`
+
+---
+
+### GET /api/communities/\{id\}/members
+
+列出社群成員。無需驗證。
+
+**回應 (200)：**
+
+```json
+{
+  "members": [
+    {
+      "id": "uuid",
+      "userId": "uuid",
+      "role": "creator",
+      "joinedAt": "...",
+      "subscriptionStatus": "active",
+      "userName": "Alice",
+      "userImage": "https://..."
+    }
+  ]
+}
+```
+
+---
+
+### POST /api/communities/\{id\}/agents
+
+新增代理到社群。需要 session 驗證。僅建立者可操作。
+
+**請求本體：**
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `listingId` | `string` | 是 | 代理清單 UUID |
+
+**回應 (201)：** `{ "success": true }`
+
+---
+
+### DELETE /api/communities/\{id\}/agents/\{listing_id\}
+
+從社群移除代理。需要 session 驗證。僅建立者可操作。
+
+**回應 (200)：** `{ "success": true }`
+
+---
+
+### GET /api/communities/\{id\}/agents
+
+列出社群中的代理。無需驗證。
+
+**回應 (200)：**
+
+```json
+{
+  "agents": [
+    {
+      "id": "uuid",
+      "listingId": "uuid",
+      "agentName": "Assistant",
+      "avatarUrl": "https://...",
+      "description": "...",
+      "model": "gpt-4o",
+      "addedAt": "..."
+    }
+  ]
+}
+```
+
+---
+
+### POST /api/communities/\{id\}/messages
+
+發送文字訊息到社群。需要 session 驗證。必須是成員。
+
+**請求本體：**
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `content` | `string` | 是 | 訊息文字（1-5000 字元） |
+
+**回應 (201)：**
+
+```json
+{
+  "id": "message-uuid",
+  "userId": "uuid",
+  "content": "Hello!",
+  "messageType": "text"
+}
+```
+
+---
+
+### POST /api/communities/\{id\}/agent-chat
+
+與社群中的 AI 代理聊天。需要 session 驗證。必須是成員。會收取 `agentCallFee`。回傳 SSE 串流。
+
+**請求本體：**
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `content` | `string` | 是 | 使用者訊息 |
+| `listingId` | `string` | 是 | 代理清單 UUID |
+
+**SSE 事件：**
+
+| 事件類型 | 欄位 | 說明 |
+|---|---|---|
+| `meta` | `communityId`, `userMessageId` | 初始中繼資料 |
+| `chunk` | `content` | 串流回應文字 |
+| `done` | — | 串流完成 |
+| `audio_ready` | `audioUrl` | TTS 音訊 URL（若有） |
+| `error` | `message` | 發生錯誤 |
+
+**錯誤：**
+- `402 Payment Required` — 餘額不足
+
+---
+
+### GET /api/communities/\{id\}/messages
+
+取得社群訊息歷史。需要 session 驗證。必須是成員。使用游標式分頁。
+
+**查詢參數：**
+
+| 參數 | 類型 | 預設值 | 說明 |
+|---|---|---|---|
+| `before` | `string` | — | ISO 日期時間游標（取得此時間之前的訊息） |
+| `limit` | `number` | `50` | 每頁筆數（最多 100） |
+
+**回應 (200)：**
+
+```json
+{
+  "messages": [
+    {
+      "id": "uuid",
+      "userId": "uuid",
+      "agentListingId": null,
+      "content": "Hello!",
+      "messageType": "text",
+      "createdAt": "...",
+      "userName": "Alice",
+      "userImage": "https://...",
+      "agentName": null,
+      "ttsAudioUrl": null
+    }
+  ]
+}
+```
+
+---
+
+### GET /api/communities/my
+
+列出已驗證使用者建立的社群。需要 session 驗證。
+
+**回應 (200)：** `{ "communities": [...] }`
+
+---
+
+### GET /api/communities/joined
+
+列出已驗證使用者加入的社群。需要 session 驗證。
+
+**回應 (200)：** `{ "communities": [...] }`
+
+---
+
+## 官方客服（Official）
+
+### POST /api/communities/\{id\}/start-chat
+
+與官方社群開始一對一對話。需要 session 驗證。若已有對話則重複使用。
+
+**回應 (200/201)：**
+
+```json
+{
+  "conversationId": "uuid",
+  "existing": false,
+  "status": "ai_active"
+}
+```
+
+初始狀態取決於社群的 `csMode`：
+- `human_only` → `"waiting_human"`
+- 其他 → `"ai_active"`
+
+---
+
+### POST /api/communities/\{id\}/transfer-human
+
+請求從 AI 轉接到真人客服。需要 session 驗證。
+
+**回應 (200)：** `{ "status": "waiting_human" }`
+
+---
+
+### POST /api/communities/\{id\}/accept-transfer
+
+客服專員接受轉接。需要 session 驗證。必須是建立者、管理員或客服專員。
+
+**請求本體：**
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `conversationId` | `string` | 是 | 對話 UUID |
+
+**回應 (200)：** `{ "status": "human_active" }`
+
+---
+
+### POST /api/communities/\{id\}/resolve
+
+將對話標記為已解決。需要 session 驗證。使用者、指派的客服專員、建立者或管理員皆可呼叫。
+
+**請求本體：**
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `conversationId` | `string` | 是 | 對話 UUID |
+
+**回應 (200)：** `{ "status": "resolved" }`
+
+---
+
+### GET /api/communities/\{id\}/cs-status
+
+取得對話的客服狀態。需要 session 驗證。
+
+**查詢參數：**
+
+| 參數 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `conversationId` | `string` | 是 | 對話 UUID |
+
+**回應 (200)：**
+
+```json
+{ "status": "ai_active" }
+```
+
+可能的值：`"ai_active"`、`"waiting_human"`、`"human_active"`、`"resolved"`、`"none"`
+
+---
+
+### GET /api/communities/\{id\}/cs-queue
+
+檢視客服佇列。需要 session 驗證。必須是建立者、管理員或客服專員。
+
+**回應 (200)：**
+
+```json
+{
+  "queue": [
+    {
+      "id": "uuid",
+      "conversationId": "uuid",
+      "userId": "uuid",
+      "status": "waiting_human",
+      "assignedCsId": null,
+      "userName": "Alice",
+      "userImage": "https://...",
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ]
+}
+```
+
+佇列依優先順序排列：`waiting_human` > `human_active` > `ai_active` > `resolved`。
+
+---
+
+### POST /api/communities/\{id\}/invite-cs
+
+邀請使用者成為客服專員。需要 session 驗證。必須是建立者或管理員。
+
+**請求本體：**
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `userId` | `string` | 是 | 要邀請的使用者 ID |
+
+**回應 (200)：** `{ "success": true }`
+
+---
+
+### POST /api/communities/\{id\}/verify
+
+提交認證申請。需要 session 驗證。僅建立者可操作。
+
+**請求本體：**
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `businessName` | `string` | 否 | 企業名稱 |
+| `businessRegistration` | `string` | 否 | 企業統一編號 |
+| `documentsUrl` | `string` | 否 | 認證文件的 URL |
+
+**回應 (201)：**
+
+```json
+{ "requestId": "uuid" }
+```
+
+---
+
+## Lounge
+
+### POST /api/lounge
+
+建立 Lounge 社群。需要 session 驗證。
+
+**請求本體：**
+
+| 欄位 | 類型 | 必填 | 預設值 | 說明 |
+|---|---|---|---|---|
+| `name` | `string` | 是 | — | Lounge 名稱（1-100 字元） |
+| `description` | `string` | 否 | — | 說明 |
+| `avatarUrl` | `string` | 否 | — | 頭像 URL |
+| `voiceSamplesUrl` | `string` | 否 | — | 聲音複製用的語音樣本 URL |
+| `freeMinutesPerDay` | `number` | 否 | `5` | 每日免費語音分鐘數 |
+| `subscriptionPriceCents` | `number` | 否 | `0` | 月費訂閱價格（美分） |
+| `defaultAgentListingId` | `string` | 否 | — | 預設代理清單 UUID |
+
+**回應 (201)：**
+
+```json
+{ "id": "lounge-uuid" }
+```
+
+---
+
+### GET /api/lounge/\{id\}
+
+取得 Lounge 詳情。無需驗證。
+
+**回應 (200)：**
+
+```json
+{
+  "id": "uuid",
+  "creatorId": "uuid",
+  "name": "My Lounge",
+  "description": "...",
+  "avatarUrl": "https://...",
+  "memberCount": 10,
+  "voiceModelId": "model-id",
+  "voiceModelStatus": "ready",
+  "voiceSamplesUrl": "https://...",
+  "freeMinutesPerDay": 5,
+  "subscriptionPriceCents": 999,
+  "defaultAgentListingId": "uuid",
+  "createdAt": "...",
+  "creatorName": "Alice",
+  "creatorImage": "https://..."
+}
+```
+
+---
+
+### POST /api/lounge/\{id\}/start-chat
+
+開始與 Lounge 代理的語音聊天工作階段。需要 session 驗證。若使用者尚未加入，會自動加入為社群成員。若已有對話則重複使用。
+
+**回應 (200/201)：**
+
+```json
+{
+  "conversationId": "uuid",
+  "existing": false
+}
+```
+
+---
+
+### GET /api/lounge/\{id\}/dashboard
+
+建立者儀表板，含 Lounge 統計資料。需要 session 驗證。僅建立者可操作。
+
+**回應 (200)：**
+
+```json
+{
+  "memberCount": 42,
+  "activeSubscriptions": 15,
+  "totalConversations": 200,
+  "todayUsageMinutes": 120
+}
+```
+
+---
+
+## 管理員端點
+
+### GET /api/admin/verification-requests
+
+列出所有認證申請。需要管理員驗證。
+
+**回應 (200)：**
+
+```json
+{
+  "requests": [
+    {
+      "id": "uuid",
+      "communityId": "uuid",
+      "requesterId": "uuid",
+      "businessName": "Acme Inc",
+      "businessRegistration": "12345",
+      "documentsUrl": "https://...",
+      "status": "pending",
+      "reviewerNotes": null,
+      "communityName": "Acme Official",
+      "createdAt": "...",
+      "reviewedAt": null
+    }
+  ]
+}
+```
+
+---
+
+### PUT /api/admin/verification-requests/\{id\}
+
+審核認證申請。需要管理員驗證。
+
+**請求本體：**
+
+| 欄位 | 類型 | 必填 | 說明 |
+|---|---|---|---|
+| `status` | `string` | 是 | `"approved"` 或 `"rejected"` |
+| `reviewerNotes` | `string` | 否 | 審核備註 |
+
+**回應 (200)：** `{ "success": true }`
+
+若批准，社群會自動標記為已認證。

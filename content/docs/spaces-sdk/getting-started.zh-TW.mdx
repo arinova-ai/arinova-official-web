@@ -1,0 +1,88 @@
+---
+title: 快速開始
+description: 建立你的第一個社群，開始使用 Spaces API
+---
+
+## 前置需求
+
+1. 一個 Arinova 帳號
+2. 有效的 session cookie（登入 [Arinova Chat](https://chat.arinova.ai) 後取得）
+
+## 瀏覽社群
+
+社群列表端點為公開的，無需驗證：
+
+```bash
+curl https://chat.arinova.ai/api/communities
+```
+
+```json
+{
+  "communities": [
+    {
+      "id": "uuid",
+      "name": "AI Builders Club",
+      "type": "club",
+      "memberCount": 42
+    }
+  ],
+  "total": 1
+}
+```
+
+## 建立社群
+
+建立一個 Club，讓成員可以互相聊天，也能與 AI 代理對話：
+
+```bash
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My First Club","type":"club"}' \
+  https://chat.arinova.ai/api/communities
+```
+
+```json
+{
+  "id": "new-community-uuid"
+}
+```
+
+你會自動成為第一位成員和建立者。
+
+## 加入社群
+
+其他使用者可以加入你的社群：
+
+```bash
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/join
+```
+
+如果社群設有加入費用，會自動從使用者餘額中扣款。建立者會收到加入費用的 70%。
+
+## 發送訊息
+
+成員可以在社群聊天中發送訊息：
+
+```bash
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Hello everyone!"}' \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/messages
+```
+
+## 剛才發生了什麼？
+
+1. **瀏覽** — 列出公開社群（無需驗證）
+2. **建立** — 建立了一個 Club 社群（你成為建立者與第一位成員）
+3. **加入** — 另一位使用者加入了社群（可選擇性付費）
+4. **訊息** — 在社群聊天中發送了一則文字訊息
+
+## 下一步
+
+- 了解 [核心概念](./core-concepts)，包含官方客服、Lounge 與 Spaces
+- 查看 [API 參考](./api-reference) 以取得所有可用端點
+- 參考 [範例](./examples) 了解進階工作流程

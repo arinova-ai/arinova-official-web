@@ -1,0 +1,287 @@
+---
+title: 範例
+description: 使用 Spaces API 的實用範例
+---
+
+## 瀏覽並加入社群
+
+```bash
+# 瀏覽公開社群
+curl "https://chat.arinova.ai/api/communities?type=club&limit=10"
+
+# 加入社群
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/join
+```
+
+```ts
+const API = "https://chat.arinova.ai/api";
+const opts = { credentials: "include" as const };
+
+// 瀏覽 Club
+const { communities } = await fetch(
+  `${API}/communities?type=club&limit=10`
+).then((r) => r.json());
+
+console.log(`Found ${communities.length} clubs`);
+
+// 加入第一個
+await fetch(`${API}/communities/${communities[0].id}/join`, {
+  ...opts,
+  method: "POST",
+});
+```
+
+## 建立含 AI 代理的 Club
+
+```bash
+# 建立 Club
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"AI Builders","type":"club","agentCallFee":10}' \
+  https://chat.arinova.ai/api/communities
+
+# 新增代理到 Club
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"listingId":"AGENT_LISTING_UUID"}' \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/agents
+```
+
+```ts
+// 建立 Club
+const { id: communityId } = await fetch(`${API}/communities`, {
+  ...opts,
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "AI Builders",
+    type: "club",
+    agentCallFee: 10,
+  }),
+}).then((r) => r.json());
+
+// 新增代理
+await fetch(`${API}/communities/${communityId}/agents`, {
+  ...opts,
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ listingId: "your-agent-listing-uuid" }),
+});
+```
+
+## 與社群代理聊天（SSE）
+
+```bash
+curl -N -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Hello!","listingId":"AGENT_LISTING_UUID"}' \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/agent-chat
+```
+
+```ts
+const res = await fetch(
+  `${API}/communities/${communityId}/agent-chat`,
+  {
+    ...opts,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      content: "Tell me about this community",
+      listingId: "agent-listing-uuid",
+    }),
+  }
+);
+
+const reader = res.body!.getReader();
+const decoder = new TextDecoder();
+let fullResponse = "";
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+
+  const text = decoder.decode(value, { stream: true });
+  for (const line of text.split("\n")) {
+    if (!line.startsWith("data: ")) continue;
+    const event = JSON.parse(line.slice(6));
+
+    switch (event.type) {
+      case "chunk":
+        fullResponse += event.content;
+        process.stdout.write(event.content);
+        break;
+      case "done":
+        console.log("\n--- Stream complete ---");
+        break;
+      case "audio_ready":
+        console.log("Audio:", event.audioUrl);
+        break;
+    }
+  }
+}
+```
+
+## 含客服系統的官方社群
+
+```bash
+# 建立混合客服模式的官方社群
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Acme Support","type":"official","csMode":"hybrid"}' \
+  https://chat.arinova.ai/api/communities
+
+# 使用者開始客服聊天
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/start-chat
+
+# 使用者請求轉接真人
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/transfer-human
+
+# 客服專員檢視佇列
+curl -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/cs-queue
+
+# 客服專員接受轉接
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"conversationId":"CONVERSATION_UUID"}' \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/accept-transfer
+
+# 結案對話
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"conversationId":"CONVERSATION_UUID"}' \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/resolve
+```
+
+```ts
+// 開始客服聊天
+const { conversationId, status } = await fetch(
+  `${API}/communities/${communityId}/start-chat`,
+  { ...opts, method: "POST" }
+).then((r) => r.json());
+
+console.log(`Chat started: ${conversationId}, status: ${status}`);
+
+// 查詢客服狀態
+const { status: csStatus } = await fetch(
+  `${API}/communities/${communityId}/cs-status?conversationId=${conversationId}`,
+  opts
+).then((r) => r.json());
+
+console.log(`CS status: ${csStatus}`);
+```
+
+## 建立 Lounge
+
+```bash
+# 建立含語音樣本的 Lounge
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name":"My Voice Lounge",
+    "description":"Chat with my AI clone",
+    "voiceSamplesUrl":"https://storage.example.com/samples.zip",
+    "freeMinutesPerDay":5,
+    "subscriptionPriceCents":999
+  }' \
+  https://chat.arinova.ai/api/lounge
+
+# 開始語音聊天
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/lounge/LOUNGE_ID/start-chat
+
+# 檢視儀表板（僅建立者）
+curl -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/lounge/LOUNGE_ID/dashboard
+```
+
+```ts
+// 建立 Lounge
+const { id: loungeId } = await fetch(`${API}/lounge`, {
+  ...opts,
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "My Voice Lounge",
+    freeMinutesPerDay: 5,
+    subscriptionPriceCents: 999,
+  }),
+}).then((r) => r.json());
+
+// 檢視儀表板
+const dashboard = await fetch(
+  `${API}/lounge/${loungeId}/dashboard`,
+  opts
+).then((r) => r.json());
+
+console.log(`Members: ${dashboard.memberCount}`);
+console.log(`Active subs: ${dashboard.activeSubscriptions}`);
+console.log(`Today's usage: ${dashboard.todayUsageMinutes} min`);
+```
+
+## Playground Spaces 與工作階段
+
+```bash
+# 建立空間
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Game Room","category":"gaming","isPublic":true}' \
+  https://chat.arinova.ai/api/spaces
+
+# 建立工作階段
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/spaces/SPACE_ID/sessions
+
+# 加入工作階段
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"role":"player"}' \
+  https://chat.arinova.ai/api/spaces/SPACE_ID/sessions/SESSION_ID/join
+
+# 離開工作階段
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/spaces/SPACE_ID/sessions/SESSION_ID/leave
+```
+
+```ts
+// 建立空間
+const space = await fetch(`${API}/spaces`, {
+  ...opts,
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "Game Room",
+    category: "gaming",
+    isPublic: true,
+    definition: {
+      iframeUrl: "https://my-game.example.com",
+    },
+  }),
+}).then((r) => r.json());
+
+// 建立並加入工作階段
+const session = await fetch(
+  `${API}/spaces/${space.id}/sessions`,
+  { ...opts, method: "POST" }
+).then((r) => r.json());
+
+console.log(`Session ${session.id} created with ${session.participantCount} participant(s)`);
+```

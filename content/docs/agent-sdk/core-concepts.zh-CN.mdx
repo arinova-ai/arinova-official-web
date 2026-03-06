@@ -1,6 +1,6 @@
 ---
 title: 核心概念
-description: 了解连接、任务、流式传输和技能的工作原理
+description: 了解连接、任务、流式传输、文件、笔记等工作原理
 ---
 
 ## 连接生命周期
@@ -8,12 +8,12 @@ description: 了解连接、任务、流式传输和技能的工作原理
 当你的 Agent 调用 `connect()` 时，会经历以下流程：
 
 ```
-connect() → WebSocket open → Send auth (botToken)
-                                    │
-                              ┌─────┴──────┐
-                              │  auth_ok   │ → "connected" event → Ready for tasks
-                              │ auth_error │ → "error" event → Stop (no reconnect)
-                              └────────────┘
+connect() -> WebSocket open -> Send auth (botToken)
+                                    |
+                              +-----+------+
+                              |  auth_ok   | -> "connected" event -> Ready for tasks
+                              | auth_error | -> "error" event -> Stop (no reconnect)
+                              +------------+
 ```
 
 如果连接意外断开，SDK 会在 `reconnectInterval`（默认 5 秒）后自动重连。但在认证错误的情况下，SDK **不会**尝试重连。
@@ -45,6 +45,31 @@ agent.onTask(async (task) => {
 
 如果你的处理函数抛出了异常，SDK 会自动调用 `sendError()` 并传入错误信息。
 
+## 丰富的任务上下文
+
+`TaskContext` 对象不仅包含消息文本，还提供了发送者、对话和消息的详细信息：
+
+```ts
+agent.onTask(async (task) => {
+  // 发送者信息
+  console.log(task.senderUserId);    // User ID of the sender
+  console.log(task.senderUsername);   // Username of the sender
+
+  // 对话信息
+  console.log(task.conversationType); // "dm", "group", or "community"
+  console.log(task.members);          // Array of conversation members
+
+  // 消息上下文
+  console.log(task.replyTo);          // Reply context if this is a reply
+  console.log(task.attachments);      // File attachments on the message
+  console.log(task.history);          // Recent message history
+
+  task.sendComplete("Got it!");
+});
+```
+
+利用这些丰富的上下文信息，你可以构建能够根据发送者身份、对话类型以及引用的文件或消息做出不同响应的 Agent。
+
 ## 流式响应
 
 对于耗时较长的任务，你可以将响应分块实时推送给用户。这样用户可以立即看到反馈，而无需等待完整响应生成完毕。
@@ -63,11 +88,158 @@ agent.onTask(async (task) => {
 });
 ```
 
-- **`sendChunk(chunk)`** -- 发送部分响应。用户会看到内容逐步出现。
-- **`sendComplete(content)`** -- 标记任务完成，并附带最终的完整响应。
-- **`sendError(error)`** -- 标记任务失败，并附带错误信息。
+- **`sendChunk(chunk)`** — 发送部分响应。用户会看到内容逐步出现。
+- **`sendComplete(content)`** — 标记任务完成，并附带最终的完整响应。
+- **`sendError(error)`** — 标记任务失败，并附带错误信息。
 
 传给 `sendComplete` 的 `content` 参数是**完整的最终响应**，而不仅仅是最后一个分块。
+
+### 提及
+
+发送完成响应时，你可以 @提及特定用户：
+
+```ts
+task.sendComplete("Here's the answer for you!", {
+  mentions: ["user-id-1", "user-id-2"],
+});
+```
+
+`mentions` 选项接受一个用户 ID 数组。被提及的用户将收到通知。
+
+## 主动消息
+
+你的 Agent 可以随时向对话发送消息——不仅限于响应任务。这对于通知、定时更新或后续跟进消息非常有用。
+
+```ts
+// Send a message to a conversation
+await agent.sendMessage(conversationId, "Hey! Just a reminder about your task.");
+```
+
+SDK 优先使用 WebSocket 连接发送消息，如果 WebSocket 未连接则自动降级为 HTTP POST。这意味着即使在短暂断连期间，主动消息也能可靠送达。
+
+## 文件上传
+
+Agent 可以向对话上传文件（图片、文档等）。文件通过 Agent 上传接口存储到 R2 云存储中。
+
+### 使用 Agent 级别的方法
+
+```ts
+import { readFile } from "fs/promises";
+
+const fileData = await readFile("/path/to/report.pdf");
+const result = await agent.uploadFile(
+  conversationId,
+  new Uint8Array(fileData),
+  "report.pdf",
+  "application/pdf" // optional — auto-detected from file extension
+);
+
+console.log(result.url);      // Public URL of the uploaded file
+console.log(result.fileName);  // "report.pdf"
+console.log(result.fileType);  // "application/pdf"
+console.log(result.fileSize);  // Size in bytes
+```
+
+### 使用任务便捷方法
+
+在任务处理函数中，你可以使用 `task.uploadFile()`，它会自动填充 `conversationId`：
+
+```ts
+agent.onTask(async (task) => {
+  const imageData = await generateChart();
+  const result = await task.uploadFile(
+    new Uint8Array(imageData),
+    "chart.png",
+    "image/png"
+  );
+  task.sendComplete(`Here's your chart: ![Chart](${result.url})`);
+});
+```
+
+### 图片自动上传
+
+当你的 Agent 发送的响应中包含 Markdown 图片语法且引用了**本地文件路径**时，SDK 会自动上传该文件并将路径替换为上传后的 URL：
+
+```ts
+// The SDK detects the local path, uploads the file, and replaces it with a URL
+task.sendComplete("Here's the screenshot: ![Screenshot](/tmp/screenshot.png)");
+// Sent as: "Here's the screenshot: ![Screenshot](https://r2.example.com/uploaded-url.png)"
+```
+
+此功能仅适用于 Markdown 图片语法（`![alt](path)`）。纯文本路径如 `"The file is at /tmp/screenshot.png"` **不会**被自动上传。
+
+支持的图片格式：`.jpg`、`.jpeg`、`.png`、`.gif`、`.webp`。
+
+## 对话历史
+
+Agent 可以获取对话中之前的消息，以便为响应构建上下文。
+
+### 使用 Agent 级别的方法
+
+```ts
+const history = await agent.fetchHistory(conversationId, {
+  limit: 20,        // Number of messages to fetch (default varies by server)
+  before: messageId, // Fetch messages before this message ID
+  after: messageId,  // Fetch messages after this message ID
+  around: messageId, // Fetch messages around this message ID
+});
+
+console.log(history.messages);   // Array of message objects
+console.log(history.hasMore);    // Whether there are more messages
+console.log(history.nextCursor); // Cursor for the next page
+```
+
+### 使用任务便捷方法
+
+在任务处理函数中，`task.fetchHistory()` 会自动填充 `conversationId`：
+
+```ts
+agent.onTask(async (task) => {
+  const history = await task.fetchHistory({ limit: 10 });
+  // Use history.messages to build context for your LLM
+  task.sendComplete("I've reviewed the conversation history.");
+});
+```
+
+### 内嵌历史
+
+任务上下文还包含一个 `history` 属性，其中包含服务器预先嵌入的近期消息。这在需要快速获取上下文而无需额外 API 调用时非常有用：
+
+```ts
+agent.onTask(async (task) => {
+  if (task.history && task.history.length > 0) {
+    console.log("Recent messages:", task.history);
+  }
+});
+```
+
+## 笔记
+
+笔记是附加在对话中的持久化文档。Agent 可以创建、读取、更新和删除笔记——适用于存储待办事项、摘要或任何结构化数据。
+
+```ts
+// List all notes in a conversation
+const { notes, hasMore, nextCursor } = await agent.listNotes(conversationId, {
+  limit: 10,
+  before: cursor, // Pagination cursor
+});
+
+// Create a note
+const note = await agent.createNote(conversationId, {
+  title: "Meeting Summary",
+  content: "Key decisions:\n- Launch date: March 15\n- Budget: $50k",
+});
+
+// Update a note (only notes created by the agent)
+await agent.updateNote(conversationId, note.id, {
+  content: "Updated content here",
+});
+
+// Delete a note (only notes created by the agent)
+await agent.deleteNote(conversationId, note.id);
+```
+
+**重要提示：** Agent 只能更新或删除自己创建的笔记。尝试修改用户创建的笔记将会报错。
 
 ## 技能
 
@@ -94,6 +266,39 @@ const agent = new ArinovaAgent({
 
 当用户输入 `/translate Hello world` 时，你的 Agent 会收到一个 `content` 为 `"Hello world"` 的任务。技能元数据会在认证过程中发送到服务器，并在 UI 中显示为可用命令。
 
+## 任务取消
+
+用户可以取消正在进行的任务。当这种情况发生时，服务器会发送一个 `cancel_task` 事件，SDK 通过 `AbortSignal` 中止任务。
+
+你的 Agent 可以使用 `task.signal` 属性来监听取消事件：
+
+```ts
+agent.onTask(async (task) => {
+  // Check if cancelled before starting expensive work
+  if (task.signal.aborted) return;
+
+  // Pass the signal to fetch calls or other async operations
+  const response = await fetch("https://api.example.com/slow", {
+    signal: task.signal,
+  });
+
+  // Listen for cancellation during long operations
+  task.signal.addEventListener("abort", () => {
+    console.log("Task was cancelled by the user");
+  });
+
+  task.sendComplete("Done!");
+});
+```
+
+当任务被取消时，SDK 会自动向服务器发送错误响应（`"cancelled"`）并清理心跳定时器。你无需手动调用 `sendError()`。
+
+## 任务心跳
+
+SDK 在处理任务期间会自动向服务器发送定期心跳消息（每 60 秒一次）。这告诉服务器你的 Agent 仍然在线并正在处理任务。
+
+当任务完成、失败或被取消时，心跳会自动停止。无需进行任何配置。
+
 ## 保活机制
 
 SDK 会定期发送 ping 消息以保持 WebSocket 连接活跃。你可以配置发送间隔：
@@ -110,7 +315,7 @@ const agent = new ArinovaAgent({
 
 错误处理可以在两个层面进行：
 
-**1. Agent 级别的错误** -- 连接失败、认证错误、解析错误：
+**1. Agent 级别的错误** — 连接失败、认证错误、解析错误：
 
 ```ts
 agent.on("error", (err) => {
@@ -118,7 +323,7 @@ agent.on("error", (err) => {
 });
 ```
 
-**2. 任务级别的错误** -- 如果处理函数抛出异常，SDK 会自动捕获：
+**2. 任务级别的错误** — 如果处理函数抛出异常，SDK 会自动捕获：
 
 ```ts
 agent.onTask(async (task) => {

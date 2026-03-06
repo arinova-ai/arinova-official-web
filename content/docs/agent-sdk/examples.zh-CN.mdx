@@ -5,7 +5,7 @@ description: 使用 Arinova Agent SDK 构建 Agent 的实用示例
 
 ## Echo Bot
 
-最简单的 Agent -- 将用户发送的内容原样返回。
+最简单的 Agent——将用户发送的内容原样返回。
 
 ```ts
 import { ArinovaAgent } from "@arinova-ai/agent-sdk";
@@ -58,6 +58,60 @@ agent.onTask(async (task) => {
 });
 
 agent.on("connected", () => console.log("LLM agent is online!"));
+await agent.connect();
+```
+
+## 上下文感知 LLM Agent
+
+利用对话历史和发送者信息为大语言模型提供完整上下文。
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+import OpenAI from "openai";
+
+const openai = new OpenAI();
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+agent.onTask(async (task) => {
+  // Fetch recent history for context
+  const history = await task.fetchHistory({ limit: 20 });
+
+  // Build messages array from history
+  const messages = history.messages.map((msg) => ({
+    role: msg.isAgent ? "assistant" as const : "user" as const,
+    content: msg.content,
+  }));
+
+  // Add the current message
+  messages.push({ role: "user", content: task.content });
+
+  // Add system prompt with context
+  messages.unshift({
+    role: "system" as any,
+    content: `You are a helpful assistant. The user's name is ${task.senderUsername}. This is a ${task.conversationType} conversation.`,
+  });
+
+  const stream = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages,
+    stream: true,
+  });
+
+  let fullResponse = "";
+  for await (const chunk of stream) {
+    const text = chunk.choices[0]?.delta?.content ?? "";
+    if (text) {
+      fullResponse += text;
+      task.sendChunk(text);
+    }
+  }
+
+  task.sendComplete(fullResponse);
+});
+
 await agent.connect();
 ```
 
@@ -120,6 +174,273 @@ agent.on("connected", () => console.log("Multi-skill agent is online!"));
 await agent.connect();
 ```
 
+## 主动消息
+
+无需等待用户输入即可向对话发送消息。适用于通知、提醒或定时更新。
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+// Track conversations the agent is part of
+const activeConversations = new Set<string>();
+
+agent.onTask(async (task) => {
+  activeConversations.add(task.conversationId);
+
+  if (task.content.startsWith("/subscribe")) {
+    task.sendComplete("You'll receive hourly updates!");
+  } else {
+    task.sendComplete(`Got it: ${task.content}`);
+  }
+});
+
+// Send periodic updates to all active conversations
+setInterval(async () => {
+  for (const convId of activeConversations) {
+    await agent.sendMessage(convId, `Hourly update: Everything is running smoothly.`);
+  }
+}, 60 * 60 * 1000); // Every hour
+
+await agent.connect();
+```
+
+## 文件上传
+
+向对话上传文件——图片、文档或其他任何类型的文件。
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+import { readFile } from "fs/promises";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+agent.onTask(async (task) => {
+  if (task.content.startsWith("/chart")) {
+    task.sendChunk("Generating chart...\n\n");
+
+    // Generate or read a file
+    const chartData = await readFile("/tmp/chart.png");
+
+    // Upload via the task convenience method
+    const result = await task.uploadFile(
+      new Uint8Array(chartData),
+      "chart.png",
+      "image/png"
+    );
+
+    // Send the image using markdown syntax
+    task.sendComplete(`Here's your chart:\n\n![Chart](${result.url})`);
+  } else {
+    task.sendComplete("Use /chart to generate a chart!");
+  }
+});
+
+await agent.connect();
+```
+
+### 图片自动上传
+
+你也可以在 Markdown 图片语法中引用本地文件路径。SDK 会自动上传这些文件：
+
+```ts
+agent.onTask(async (task) => {
+  // Save an image to disk first (e.g., from a chart library)
+  await saveChartToDisk("/tmp/my-chart.png");
+
+  // The SDK auto-uploads the local file and replaces the path with a URL
+  task.sendComplete("Here's the result:\n\n![Chart](/tmp/my-chart.png)");
+});
+```
+
+## 处理附件
+
+处理用户发送给 Agent 的文件。
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+agent.onTask(async (task) => {
+  if (task.attachments && task.attachments.length > 0) {
+    const fileList = task.attachments
+      .map((a) => `- ${a.fileName} (${a.fileType}, ${a.fileSize} bytes)`)
+      .join("\n");
+
+    task.sendChunk(`I received ${task.attachments.length} file(s):\n${fileList}\n\nProcessing...\n\n`);
+
+    // Download and process each attachment
+    for (const attachment of task.attachments) {
+      const response = await fetch(attachment.url);
+      const data = await response.arrayBuffer();
+      // Process the file data...
+    }
+
+    task.sendComplete("All files processed!");
+  } else {
+    task.sendComplete("Send me a file and I'll process it for you.");
+  }
+});
+
+await agent.connect();
+```
+
+## 笔记 CRUD
+
+在对话中创建、读取、更新和删除笔记。适用于待办事项、会议记录或持久化存储。
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+agent.onTask(async (task) => {
+  const content = task.content.trim();
+
+  // List notes
+  if (content === "/notes") {
+    const { notes } = await agent.listNotes(task.conversationId);
+    if (notes.length === 0) {
+      task.sendComplete("No notes yet. Use `/note add <title>` to create one.");
+      return;
+    }
+    const list = notes.map((n) => `- **${n.title}** (${n.id})`).join("\n");
+    task.sendComplete(`Notes:\n${list}`);
+    return;
+  }
+
+  // Create a note
+  if (content.startsWith("/note add ")) {
+    const title = content.replace("/note add ", "").trim();
+    const note = await agent.createNote(task.conversationId, {
+      title,
+      content: "",
+    });
+    task.sendComplete(`Note created: **${note.title}** (ID: ${note.id})`);
+    return;
+  }
+
+  // Update a note
+  if (content.startsWith("/note edit ")) {
+    // Format: /note edit <noteId> <new content>
+    const parts = content.replace("/note edit ", "").split(" ");
+    const noteId = parts[0];
+    const newContent = parts.slice(1).join(" ");
+    await agent.updateNote(task.conversationId, noteId, {
+      content: newContent,
+    });
+    task.sendComplete(`Note ${noteId} updated.`);
+    return;
+  }
+
+  // Delete a note
+  if (content.startsWith("/note delete ")) {
+    const noteId = content.replace("/note delete ", "").trim();
+    await agent.deleteNote(task.conversationId, noteId);
+    task.sendComplete(`Note ${noteId} deleted.`);
+    return;
+  }
+
+  task.sendComplete("Commands: `/notes`, `/note add <title>`, `/note edit <id> <content>`, `/note delete <id>`");
+});
+
+await agent.connect();
+```
+
+## 使用 AbortSignal 处理任务取消
+
+使用 `AbortSignal` 优雅地处理任务取消。
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+agent.onTask(async (task) => {
+  task.sendChunk("Starting a long operation...\n\n");
+
+  // Pass the signal to fetch so it aborts if the user cancels
+  try {
+    const response = await fetch("https://api.example.com/slow-endpoint", {
+      signal: task.signal,
+    });
+    const data = await response.json();
+    task.sendComplete(`Result: ${JSON.stringify(data)}`);
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      // Task was cancelled by the user — SDK handles cleanup automatically
+      console.log("Task cancelled by user");
+      return;
+    }
+    throw err; // Re-throw non-cancellation errors
+  }
+});
+
+await agent.connect();
+```
+
+### 带取消的轮询
+
+对于长时间运行的循环，定期检查 `task.signal.aborted`：
+
+```ts
+agent.onTask(async (task) => {
+  task.sendChunk("Processing 100 items...\n\n");
+
+  for (let i = 0; i < 100; i++) {
+    // Check if the user cancelled
+    if (task.signal.aborted) {
+      console.log("Cancelled at item", i);
+      return; // SDK already sent the cancellation error
+    }
+
+    await processItem(i);
+    task.sendChunk(`Completed item ${i + 1}/100\n`);
+  }
+
+  task.sendComplete("All 100 items processed!");
+});
+```
+
+## 提及
+
+在 Agent 的响应中标记特定用户。
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+agent.onTask(async (task) => {
+  // In a group conversation, mention the sender in the reply
+  task.sendComplete(`Here's the info you requested!`, {
+    mentions: [task.senderUserId],
+  });
+});
+
+await agent.connect();
+```
+
 ## 错误处理与重试
 
 一个具备完善错误处理和优雅降级能力的 Agent。
@@ -170,4 +491,43 @@ async function processMessage(content: string): Promise<string> {
   // Your business logic here
   return `Processed: ${content}`;
 }
+```
+
+## 群组对话 Agent
+
+一个根据对话类型和成员做出不同响应的 Agent。
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+agent.onTask(async (task) => {
+  // Different behavior for DMs vs groups
+  if (task.conversationType === "dm") {
+    task.sendComplete(`Hi ${task.senderUsername}! How can I help you?`);
+    return;
+  }
+
+  if (task.conversationType === "group") {
+    const memberCount = task.members?.length ?? 0;
+    task.sendComplete(
+      `Hi ${task.senderUsername}! I'm here to help this group of ${memberCount} members.`
+    );
+    return;
+  }
+
+  // Handle replies
+  if (task.replyTo) {
+    task.sendComplete(`I see you're replying to a previous message. Let me help with that.`);
+    return;
+  }
+
+  task.sendComplete("Hello!");
+});
+
+await agent.connect();
 ```

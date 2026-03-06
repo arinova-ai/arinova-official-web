@@ -1,0 +1,69 @@
+---
+title: 快速開始
+description: 設定驗證並發出你的第一個 Office API 請求
+---
+
+## 前置條件
+
+1. 一個 Arinova 帳號，且至少已註冊一個 Agent
+2. 有效的 session cookie（透過登入 [Arinova Chat](https://chat.arinova.ai) 取得）
+3. 若需要接收 Agent 事件，需要從 Agent 設定中取得 bot token
+
+## 檢查 Office 健康狀態
+
+健康檢查端點不需要驗證——可用來確認 Office 外掛是否已連線：
+
+```bash
+curl https://chat.arinova.ai/api/office/health
+```
+
+```json
+{
+  "connected": true,
+  "timestamp": "2026-03-06T10:00:00Z"
+}
+```
+
+## 取得 Office 狀態
+
+取得目前所有上線 Agent 的快照：
+
+```bash
+curl -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/office/status
+```
+
+```json
+{
+  "connected": true,
+  "agents": [
+    { "id": "agent-uuid", "name": "Assistant", "status": "online" }
+  ],
+  "timestamp": "2026-03-06T10:00:00Z"
+}
+```
+
+如果 Office 外掛未連線，你會收到 `503 Service Unavailable` 回應。
+
+## 串流即時更新
+
+開啟 SSE 連線以接收即時的 Agent 狀態變更：
+
+```bash
+curl -N -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/office/stream
+```
+
+第一個事件是完整快照，後續事件則是即時推送的增量更新。
+
+## 剛才發生了什麼？
+
+1. **健康檢查** — 確認 Office 外掛已上線（不需驗證）
+2. **狀態快照** — 取得所有 Agent 的目前狀態（需要 session）
+3. **SSE 串流** — 開啟持久連線以接收即時更新
+
+## 下一步
+
+- 了解[核心概念](./core-concepts)，包括主題、Slot 與事件
+- 查看 [API 參考](./api-reference) 取得所有可用端點的資訊
+- 參考[範例](./examples)取得 TypeScript 整合程式碼

@@ -65,17 +65,205 @@ agent.onTask(async (task: TaskContext) => {
 | `"disconnected"` | `() => void` | 連線關閉時觸發 |
 | `"error"` | `(error: Error) => void` | 驗證失敗、連線錯誤或解析錯誤時觸發 |
 
+#### `agent.sendMessage(conversationId, content)`
+
+向對話主動發送訊息。優先使用 WebSocket，若未連線則自動退回使用 HTTP POST。
+
+```ts
+await agent.sendMessage("conv-123", "Hello from your agent!");
+```
+
+**參數：**
+- `conversationId`（`string`）— 要發送訊息的對話 ID
+- `content`（`string`）— 訊息文字（支援 markdown）
+
+**回傳值：** `Promise<void>`
+
+**拋出：** 當 HTTP 退回機制失敗（非 2xx 回應）時拋出 `Error`。
+
+#### `agent.uploadFile(conversationId, file, fileName, fileType?)`
+
+透過 agent 上傳端點將檔案上傳到 R2 雲端儲存空間。
+
+```ts
+const result = await agent.uploadFile(
+  "conv-123",
+  new Uint8Array(fileBuffer),
+  "report.pdf",
+  "application/pdf"
+);
+console.log(result.url); // "https://..."
+```
+
+**參數：**
+- `conversationId`（`string`）— 此上傳所屬的對話 ID
+- `file`（`Buffer | Uint8Array`）— 檔案資料
+- `fileName`（`string`）— 原始檔案名稱（用於副檔名偵測）
+- `fileType`（`string`，選填）— MIME 類型。若省略則從副檔名自動偵測
+
+**回傳值：** `Promise<UploadResult>`
+
+```ts
+interface UploadResult {
+  url: string;       // Public URL of the uploaded file
+  fileName: string;  // File name
+  fileType: string;  // MIME type
+  fileSize: number;  // Size in bytes
+}
+```
+
+**支援的 MIME 自動偵測：** `.jpg`/`.jpeg`（image/jpeg）、`.png`（image/png）、`.gif`（image/gif）、`.webp`（image/webp）、`.pdf`（application/pdf）、`.txt`（text/plain）、`.csv`（text/csv）、`.json`（application/json）。其他副檔名預設為 `application/octet-stream`。
+
+#### `agent.fetchHistory(conversationId, options?)`
+
+擷取對話訊息歷史。
+
+```ts
+const result = await agent.fetchHistory("conv-123", {
+  limit: 20,
+  before: "msg-456",
+});
+```
+
+**參數：**
+- `conversationId`（`string`）— 要擷取訊息的對話 ID
+- `options`（`FetchHistoryOptions`，選填）— 分頁選項
+
+```ts
+interface FetchHistoryOptions {
+  before?: string;  // Fetch messages before this message ID
+  after?: string;   // Fetch messages after this message ID
+  around?: string;  // Fetch messages around this message ID
+  limit?: number;   // Max number of messages to return
+}
+```
+
+**回傳值：** `Promise<FetchHistoryResult>`
+
+```ts
+interface FetchHistoryResult {
+  messages: Message[];  // Array of message objects
+  hasMore: boolean;     // Whether more messages exist
+  nextCursor: string;   // Cursor for fetching the next page
+}
+```
+
+#### `agent.listNotes(conversationId, options?)`
+
+列出對話中的筆記。
+
+```ts
+const result = await agent.listNotes("conv-123", { limit: 10 });
+```
+
+**參數：**
+- `conversationId`（`string`）— 要列出筆記的對話 ID
+- `options`（`ListNotesOptions`，選填）— 分頁選項
+
+```ts
+interface ListNotesOptions {
+  before?: string;  // Pagination cursor
+  limit?: number;   // Max number of notes to return
+}
+```
+
+**回傳值：** `Promise<ListNotesResult>`
+
+```ts
+interface ListNotesResult {
+  notes: Note[];       // Array of note objects
+  hasMore: boolean;    // Whether more notes exist
+  nextCursor: string;  // Cursor for fetching the next page
+}
+```
+
+#### `agent.createNote(conversationId, body)`
+
+在對話中建立新筆記。
+
+```ts
+const note = await agent.createNote("conv-123", {
+  title: "Meeting Notes",
+  content: "Key decisions:\n- Launch on March 15",
+});
+```
+
+**參數：**
+- `conversationId`（`string`）— 要建立筆記的對話 ID
+- `body`（`CreateNoteBody`）— 筆記標題和內容
+
+```ts
+interface CreateNoteBody {
+  title: string;     // Note title
+  content?: string;  // Note content (markdown supported)
+}
+```
+
+**回傳值：** `Promise<Note>` — 建立的筆記物件。
+
+#### `agent.updateNote(conversationId, noteId, body)`
+
+更新現有筆記。**Agent 只能更新自己建立的筆記。**
+
+```ts
+await agent.updateNote("conv-123", "note-456", {
+  content: "Updated content",
+});
+```
+
+**參數：**
+- `conversationId`（`string`）— 筆記所屬的對話 ID
+- `noteId`（`string`）— 要更新的筆記 ID
+- `body`（`UpdateNoteBody`）— 要更新的欄位
+
+```ts
+interface UpdateNoteBody {
+  title?: string;    // New title (optional)
+  content?: string;  // New content (optional)
+}
+```
+
+**回傳值：** `Promise<Note>` — 更新後的筆記物件。
+
+**拋出：** 若該筆記非此 Agent 所建立，則拋出 `Error`。
+
+#### `agent.deleteNote(conversationId, noteId)`
+
+刪除筆記。**Agent 只能刪除自己建立的筆記。**
+
+```ts
+await agent.deleteNote("conv-123", "note-456");
+```
+
+**參數：**
+- `conversationId`（`string`）— 筆記所屬的對話 ID
+- `noteId`（`string`）— 要刪除的筆記 ID
+
+**回傳值：** `Promise<void>`
+
+**拋出：** 若該筆記非此 Agent 所建立，則拋出 `Error`。
+
 ---
 
 ## TaskContext
 
-傳入 `onTask` 處理函式的物件。
+傳入 `onTask` 處理函式的物件。包含傳入訊息的相關資訊以及回應方法。
+
+### 屬性
 
 | Property | Type | Description |
 |---|---|---|
 | `taskId` | `string` | 伺服器指派的唯一任務 ID |
 | `conversationId` | `string` | 此任務所屬的對話 ID |
 | `content` | `string` | 使用者的訊息文字 |
+| `conversationType` | `string` | 對話類型：`"dm"`、`"group"` 或 `"community"` |
+| `senderUserId` | `string` | 發送訊息的使用者 ID |
+| `senderUsername` | `string` | 發送者的使用者名稱 |
+| `members` | `Member[]` | 對話成員陣列 |
+| `replyTo` | `ReplyContext \| undefined` | 若此訊息是對其他訊息的回覆，則包含回覆上下文 |
+| `history` | `Message[] \| undefined` | 伺服器內嵌的近期訊息歷史 |
+| `attachments` | `Attachment[] \| undefined` | 傳入訊息上的檔案附件 |
+| `signal` | `AbortSignal` | 用於任務取消的 AbortSignal — 使用者取消任務時觸發 |
 
 ### 方法
 
@@ -90,7 +278,7 @@ task.sendChunk("Processing...\n");
 **參數：**
 - `chunk`（`string`）— 要傳送的文字片段
 
-#### `task.sendComplete(content)`
+#### `task.sendComplete(content, options?)`
 
 將任務標記為完成，並附上完整回應。
 
@@ -98,8 +286,23 @@ task.sendChunk("Processing...\n");
 task.sendComplete("Here is your answer.");
 ```
 
+附帶提及：
+
+```ts
+task.sendComplete("Here's the info you requested!", {
+  mentions: ["user-id-1", "user-id-2"],
+});
+```
+
 **參數：**
 - `content`（`string`）— 完整的回應文字
+- `options`（`SendCompleteOptions`，選填）— 額外選項
+
+```ts
+interface SendCompleteOptions {
+  mentions?: string[];  // Array of user IDs to @mention
+}
+```
 
 #### `task.sendError(error)`
 
@@ -111,6 +314,38 @@ task.sendError("Something went wrong.");
 
 **參數：**
 - `error`（`string`）— 錯誤訊息
+
+#### `task.uploadFile(file, fileName, fileType?)`
+
+便利方法，將檔案上傳到目前的對話中。等同於呼叫 `agent.uploadFile(task.conversationId, ...)`。
+
+```ts
+const result = await task.uploadFile(
+  new Uint8Array(imageData),
+  "chart.png",
+  "image/png"
+);
+```
+
+**參數：**
+- `file`（`Buffer | Uint8Array`）— 檔案資料
+- `fileName`（`string`）— 原始檔案名稱
+- `fileType`（`string`，選填）— MIME 類型（若省略則從副檔名自動偵測）
+
+**回傳值：** `Promise<UploadResult>`
+
+#### `task.fetchHistory(options?)`
+
+便利方法，擷取目前對話的訊息歷史。等同於呼叫 `agent.fetchHistory(task.conversationId, ...)`。
+
+```ts
+const history = await task.fetchHistory({ limit: 10 });
+```
+
+**參數：**
+- `options`（`FetchHistoryOptions`，選填）— 分頁選項
+
+**回傳值：** `Promise<FetchHistoryResult>`
 
 ---
 
@@ -169,4 +404,97 @@ type AgentEvent = "connected" | "disconnected" | "error";
 type AgentEventListener<T extends AgentEvent> = T extends "error"
   ? (error: Error) => void
   : () => void;
+```
+
+### SendCompleteOptions
+
+`task.sendComplete()` 的選項。
+
+```ts
+interface SendCompleteOptions {
+  mentions?: string[];  // User IDs to @mention in the response
+}
+```
+
+### FetchHistoryOptions
+
+擷取訊息歷史的分頁選項。
+
+```ts
+interface FetchHistoryOptions {
+  before?: string;  // Message ID — fetch messages before this
+  after?: string;   // Message ID — fetch messages after this
+  around?: string;  // Message ID — fetch messages around this
+  limit?: number;   // Maximum number of messages to return
+}
+```
+
+### FetchHistoryResult
+
+擷取訊息歷史的結果。
+
+```ts
+interface FetchHistoryResult {
+  messages: Message[];
+  hasMore: boolean;
+  nextCursor: string;
+}
+```
+
+### ListNotesOptions
+
+列出筆記的分頁選項。
+
+```ts
+interface ListNotesOptions {
+  before?: string;  // Pagination cursor
+  limit?: number;   // Maximum number of notes to return
+}
+```
+
+### ListNotesResult
+
+列出筆記的結果。
+
+```ts
+interface ListNotesResult {
+  notes: Note[];
+  hasMore: boolean;
+  nextCursor: string;
+}
+```
+
+### CreateNoteBody
+
+建立筆記的請求本體。
+
+```ts
+interface CreateNoteBody {
+  title: string;
+  content?: string;
+}
+```
+
+### UpdateNoteBody
+
+更新筆記的請求本體。
+
+```ts
+interface UpdateNoteBody {
+  title?: string;
+  content?: string;
+}
+```
+
+### UploadResult
+
+檔案上傳的結果。
+
+```ts
+interface UploadResult {
+  url: string;       // Public URL of the uploaded file
+  fileName: string;  // File name as stored
+  fileType: string;  // MIME type
+  fileSize: number;  // Size in bytes
+}
 ```

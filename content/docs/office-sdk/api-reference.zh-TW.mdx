@@ -1,0 +1,250 @@
+---
+title: API 參考
+description: Office API 的完整端點文件
+---
+
+## Office 端點
+
+### GET /api/office/health
+
+輕量級健康檢查。不需要驗證。
+
+**回應：**
+
+```json
+{
+  "connected": true,
+  "timestamp": "2026-03-06T10:00:00Z"
+}
+```
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `connected` | `boolean` | Office 外掛是否已連線 |
+| `timestamp` | `string` | ISO 8601 時間戳記 |
+
+---
+
+### GET /api/office/status
+
+回傳所有上線 Agent 的快照。需要 session 驗證。
+
+**回應 (200)：**
+
+```json
+{
+  "connected": true,
+  "agents": [],
+  "timestamp": "2026-03-06T10:00:00Z"
+}
+```
+
+**錯誤 (503)：** Office 外掛未連線。
+
+---
+
+### GET /api/office/stream
+
+開啟 SSE 連線以接收即時的 Agent 狀態更新。需要 session 驗證。
+
+第一個事件是完整快照，後續事件是增量的 `InternalEvent` 更新。連線使用 keep-alive 保持開啟。
+
+**錯誤 (503)：** Office 外掛未連線。
+
+---
+
+### POST /api/office/event
+
+接收來自 Agent 的活動事件。需要 **bot token** 驗證（`Authorization: Bearer <botToken>`）。
+
+伺服器會基於安全性考量，將 payload 中的 `agent_id` 覆寫為已驗證 Agent 的 ID。
+
+**請求主體：** `InternalEvent`（來自 OpenClaw 外掛）
+
+**回應：** `204 No Content`
+
+---
+
+### GET /api/office/bindings
+
+取得特定主題的 Slot 綁定。需要 session 驗證。
+
+**查詢參數：**
+
+| 參數 | 型別 | 必填 | 說明 |
+|---|---|---|---|
+| `themeId` | `string` | 是 | 要查詢綁定的主題 ID |
+
+**回應 (200)：**
+
+```json
+[
+  {
+    "slotIndex": 0,
+    "agentId": "uuid",
+    "agentName": "Assistant",
+    "agentAvatarUrl": "https://..."
+  }
+]
+```
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `slotIndex` | `number` | Slot 位置索引 |
+| `agentId` | `string` | 綁定 Agent 的 UUID |
+| `agentName` | `string \| null` | Agent 顯示名稱 |
+| `agentAvatarUrl` | `string \| null` | Agent 頭像網址 |
+
+---
+
+### PUT /api/office/bindings
+
+將 Agent 指派到一個 Slot。需要 session 驗證。
+
+使用**移動語意** — 如果 Agent 已在同一主題的其他 Slot 中，會先從原 Slot 移除。
+
+**請求主體：**
+
+```json
+{
+  "themeId": "cozy-office",
+  "slotIndex": 0,
+  "agentId": "agent-uuid"
+}
+```
+
+| 欄位 | 型別 | 必填 | 說明 |
+|---|---|---|---|
+| `themeId` | `string` | 是 | 目標主題 ID |
+| `slotIndex` | `number` | 是 | 目標 Slot 索引 |
+| `agentId` | `string` | 是 | 要綁定的 Agent UUID |
+
+**回應 (200)：**
+
+```json
+{
+  "slotIndex": 0,
+  "agentId": "agent-uuid",
+  "themeId": "cozy-office"
+}
+```
+
+**錯誤：**
+- `403 Forbidden` — Agent 不屬於已驗證的使用者
+- `409 Conflict` — 綁定衝突
+
+---
+
+### DELETE /api/office/bindings/\{theme_id\}/\{slot_index\}
+
+移除 Slot 綁定。需要 session 驗證。
+
+**路徑參數：**
+
+| 參數 | 型別 | 說明 |
+|---|---|---|
+| `theme_id` | `string` | 主題 ID |
+| `slot_index` | `number` | 要解除綁定的 Slot 索引 |
+
+**回應：** `204 No Content`
+
+---
+
+## 主題端點
+
+### POST /api/themes/upload
+
+上傳主題套件（設定清單 + 素材包）。需要 session 驗證。使用 `multipart/form-data`。
+
+**Multipart 欄位：**
+
+| 欄位 | 型別 | 大小上限 | 說明 |
+|---|---|---|---|
+| `manifest` | `text (JSON)` | 256 KB | 主題設定清單（`theme.json` 內容） |
+| `bundle` | `file (ZIP)` | 200 MB | 包含圖片、模型、音訊等的素材包 |
+
+**設定清單結構：**
+
+| 欄位 | 型別 | 必填 | 說明 |
+|---|---|---|---|
+| `id` | `string` | 是 | Kebab-case 識別碼（例如 `my-theme`），最長 100 字元 |
+| `name` | `string` | 是 | 顯示名稱，最長 100 字元 |
+| `version` | `string` | 是 | Semver 格式（例如 `1.0.0`） |
+| `renderer` | `string` | 否 | 3D 主題使用 `"threejs"`；省略則為 PixiJS |
+| `room` | `object` | 僅 v3 | 3D 房間設定，包含 `model` 路徑 |
+| `zones` | `array` | 僅 v2 | 2D 區域定義 |
+| `layers` | `array` | 僅 v2 | 2D 圖層定義 |
+| `characters` | `object` | 僅 v2 | 角色精靈圖設定 |
+
+**驗證規則：**
+- v2 (PixiJS)：`zones`、`layers` 與 `characters` 不得為空
+- v3 (Three.js)：`renderer` 必須為 `"threejs"` 或 `room.model` 必須設定
+- 素材包中的檔案必須使用允許的副檔名（`png`、`jpg`、`jpeg`、`webp`、`gif`、`svg`、`glb`、`gltf`、`mp3`、`ogg`、`wav`、`json`）
+- ZIP 項目中不得包含路徑穿越（`..` 或絕對路徑）
+
+**回應 (201)：**
+
+```json
+{
+  "themeId": "cozy-office",
+  "name": "Cozy Office",
+  "version": "1.0.0"
+}
+```
+
+**錯誤：**
+- `400 Bad Request` — 驗證失敗或超過大小限制
+
+---
+
+### GET /api/themes
+
+列出所有已安裝的主題。需要 session 驗證。
+
+**回應 (200)：**
+
+```json
+{
+  "themes": [
+    {
+      "id": "cozy-office",
+      "name": "Cozy Office",
+      "version": "1.0.0",
+      "description": "",
+      "renderer": "pixi"
+    }
+  ]
+}
+```
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `id` | `string` | 主題識別碼 |
+| `name` | `string` | 顯示名稱 |
+| `version` | `string` | Semver 版本號 |
+| `description` | `string` | 主題說明 |
+| `renderer` | `string` | `"pixi"` 或 `"threejs"` |
+
+---
+
+### DELETE /api/themes/\{themeId\}
+
+刪除主題及其所有檔案。需要 session 驗證。
+
+**路徑參數：**
+
+| 參數 | 型別 | 說明 |
+|---|---|---|
+| `themeId` | `string` | 主題 ID（kebab-case） |
+
+**回應 (200)：**
+
+```json
+{
+  "deleted": "cozy-office"
+}
+```
+
+**錯誤：**
+- `400 Bad Request` — 無效的主題 ID 格式
+- `404 Not Found` — 主題不存在
