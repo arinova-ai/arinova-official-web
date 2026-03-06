@@ -1,0 +1,77 @@
+---
+title: Getting Started
+description: Install the Agent SDK and build your first agent in 5 minutes
+---
+
+## Installation
+
+```bash
+npm install @arinova-ai/agent-sdk
+```
+
+The SDK has zero dependencies and works in any Node.js environment (v18+).
+
+## Get a Bot Token
+
+1. Open the [Arinova Chat](https://chat.arinova.ai) dashboard
+2. Navigate to your bot settings (or create a new bot)
+3. Copy the bot token from the settings page
+
+Keep your bot token secret. Use environment variables — never commit it to version control.
+
+```bash
+# .env
+BOT_TOKEN=your-bot-token-here
+```
+
+## Build Your First Agent
+
+Create a file called `agent.ts`:
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+// Handle incoming messages
+agent.onTask(async (task) => {
+  task.sendComplete(`Echo: ${task.content}`);
+});
+
+// Lifecycle events
+agent.on("connected", () => {
+  console.log("Agent connected!");
+});
+
+agent.on("error", (err) => {
+  console.error("Error:", err.message);
+});
+
+// Connect
+await agent.connect();
+console.log("Agent is running...");
+```
+
+## Run It
+
+```bash
+npx tsx agent.ts
+```
+
+Your agent is now online. Open Arinova Chat, find your bot, and send it a message. It will echo your message back.
+
+## What Just Happened?
+
+1. **`new ArinovaAgent()`** — Created an agent instance with your server URL and bot token
+2. **`agent.onTask()`** — Registered a handler that runs whenever a user sends your agent a message
+3. **`task.sendComplete()`** — Sent the final response back to the user
+4. **`agent.connect()`** — Connected to Arinova Chat via WebSocket and authenticated
+
+## Next Steps
+
+- Learn about [Core Concepts](./core-concepts) like streaming and skills
+- See the [API Reference](./api-reference) for all available methods
+- Check out [Examples](./examples) for more advanced use cases

@@ -1,0 +1,172 @@
+---
+title: API Reference
+description: Complete API documentation for @arinova-ai/agent-sdk
+---
+
+## ArinovaAgent
+
+The main class for creating an agent.
+
+### Constructor
+
+```ts
+new ArinovaAgent(options: ArinovaAgentOptions)
+```
+
+| Option | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `serverUrl` | `string` | Yes | — | WebSocket server URL (e.g. `wss://chat.arinova.ai`) |
+| `botToken` | `string` | Yes | — | Bot token from the Arinova dashboard |
+| `skills` | `AgentSkill[]` | No | `[]` | Skills this agent supports (shown as slash commands) |
+| `reconnectInterval` | `number` | No | `5000` | Milliseconds between reconnect attempts |
+| `pingInterval` | `number` | No | `30000` | Milliseconds between keep-alive pings |
+
+### Methods
+
+#### `agent.connect()`
+
+Connects to the server and authenticates. Returns a `Promise<void>` that resolves on successful auth or rejects on auth failure.
+
+```ts
+try {
+  await agent.connect();
+} catch (err) {
+  console.error("Failed to connect:", err);
+}
+```
+
+The agent automatically reconnects on unexpected disconnects. It does **not** reconnect on authentication errors.
+
+#### `agent.disconnect()`
+
+Closes the WebSocket connection and stops automatic reconnection.
+
+```ts
+agent.disconnect();
+```
+
+#### `agent.onTask(handler)`
+
+Registers the task handler. Called each time a user sends a message. Returns `this` for chaining.
+
+```ts
+agent.onTask(async (task: TaskContext) => {
+  // handle the task
+});
+```
+
+#### `agent.on(event, listener)`
+
+Subscribes to lifecycle events. Returns `this` for chaining.
+
+| Event | Listener | Description |
+|---|---|---|
+| `"connected"` | `() => void` | Fired after successful authentication |
+| `"disconnected"` | `() => void` | Fired when the connection closes |
+| `"error"` | `(error: Error) => void` | Fired on auth failure, connection errors, or parse errors |
+
+---
+
+## TaskContext
+
+The object passed to your `onTask` handler.
+
+| Property | Type | Description |
+|---|---|---|
+| `taskId` | `string` | Unique task ID assigned by the server |
+| `conversationId` | `string` | ID of the conversation this task belongs to |
+| `content` | `string` | The user's message text |
+
+### Methods
+
+#### `task.sendChunk(chunk)`
+
+Sends a streaming text chunk to the user.
+
+```ts
+task.sendChunk("Processing...\n");
+```
+
+**Parameters:**
+- `chunk` (`string`) — The text chunk to send
+
+#### `task.sendComplete(content)`
+
+Marks the task as complete with the full response.
+
+```ts
+task.sendComplete("Here is your answer.");
+```
+
+**Parameters:**
+- `content` (`string`) — The complete response text
+
+#### `task.sendError(error)`
+
+Marks the task as failed with an error message.
+
+```ts
+task.sendError("Something went wrong.");
+```
+
+**Parameters:**
+- `error` (`string`) — The error message
+
+---
+
+## Types
+
+### AgentSkill
+
+Declares a skill (slash command) for the agent.
+
+```ts
+interface AgentSkill {
+  /** Unique skill identifier (used as slash command, e.g. "draw") */
+  id: string;
+  /** Human-readable skill name */
+  name: string;
+  /** Short description of what the skill does */
+  description: string;
+}
+```
+
+### ArinovaAgentOptions
+
+Options for the `ArinovaAgent` constructor.
+
+```ts
+interface ArinovaAgentOptions {
+  serverUrl: string;
+  botToken: string;
+  skills?: AgentSkill[];
+  reconnectInterval?: number;
+  pingInterval?: number;
+}
+```
+
+### TaskHandler
+
+The function signature for task handlers.
+
+```ts
+type TaskHandler = (task: TaskContext) => void | Promise<void>;
+```
+
+### AgentEvent
+
+The event types you can listen to.
+
+```ts
+type AgentEvent = "connected" | "disconnected" | "error";
+```
+
+### AgentEventListener
+
+Event listener signatures mapped by event type.
+
+```ts
+type AgentEventListener<T extends AgentEvent> = T extends "error"
+  ? (error: Error) => void
+  : () => void;
+```

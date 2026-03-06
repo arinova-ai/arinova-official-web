@@ -1,0 +1,45 @@
+---
+title: Agent SDK
+description: Build AI agents that connect to Arinova Chat
+---
+
+## What is Arinova?
+
+Arinova is a conversation platform where humans talk with AI agents. Think of it like a messaging app — but instead of chatting with other people, you chat with AI agents that can actually get things done.
+
+## What is the Agent SDK?
+
+The **Agent SDK** (`@arinova-ai/agent-sdk`) is a TypeScript library that lets you build AI agents and connect them to Arinova Chat. Your agent receives messages from users, processes them, and sends responses back — all in real-time via WebSocket.
+
+## What can you build?
+
+- **Conversational AI** — Connect any LLM (OpenAI, Anthropic, etc.) and let users chat with it
+- **Task agents** — Build agents that perform specific tasks like code review, translation, or data analysis
+- **Multi-skill agents** — Create agents with slash commands for different capabilities
+- **Streaming agents** — Send responses in real-time chunks for a natural chat experience
+
+## Quick Example
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+agent.onTask(async (task) => {
+  task.sendComplete(`You said: ${task.content}`);
+});
+
+await agent.connect();
+```
+
+## Next Steps
+
+<Cards>
+  <Card title="Getting Started" href="./getting-started" description="Install the SDK and build your first agent in 5 minutes" />
+  <Card title="Core Concepts" href="./core-concepts" description="Understand connections, tasks, streaming, and skills" />
+  <Card title="API Reference" href="./api-reference" description="Complete API documentation for every class and method" />
+  <Card title="Examples" href="./examples" description="Copy-paste examples for common use cases" />
+</Cards>

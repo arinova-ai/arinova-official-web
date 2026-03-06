@@ -1,0 +1,172 @@
+---
+title: API 参考
+description: "@arinova-ai/agent-sdk 完整 API 文档"
+---
+
+## ArinovaAgent
+
+用于创建 Agent 的主类。
+
+### 构造函数
+
+```ts
+new ArinovaAgent(options: ArinovaAgentOptions)
+```
+
+| Option | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `serverUrl` | `string` | Yes | — | WebSocket 服务器地址（如 `wss://chat.arinova.ai`） |
+| `botToken` | `string` | Yes | — | 从 Arinova 控制面板获取的 Bot Token |
+| `skills` | `AgentSkill[]` | No | `[]` | 该 Agent 支持的技能（显示为斜杠命令） |
+| `reconnectInterval` | `number` | No | `5000` | 重连尝试之间的等待时间（毫秒） |
+| `pingInterval` | `number` | No | `30000` | 保活 ping 的发送间隔（毫秒） |
+
+### 方法
+
+#### `agent.connect()`
+
+连接到服务器并进行身份认证。返回一个 `Promise<void>`，认证成功时 resolve，认证失败时 reject。
+
+```ts
+try {
+  await agent.connect();
+} catch (err) {
+  console.error("Failed to connect:", err);
+}
+```
+
+Agent 在意外断连时会自动重连，但在认证错误的情况下**不会**重连。
+
+#### `agent.disconnect()`
+
+关闭 WebSocket 连接并停止自动重连。
+
+```ts
+agent.disconnect();
+```
+
+#### `agent.onTask(handler)`
+
+注册任务处理函数。每当用户发送消息时都会调用该函数。返回 `this` 以支持链式调用。
+
+```ts
+agent.onTask(async (task: TaskContext) => {
+  // handle the task
+});
+```
+
+#### `agent.on(event, listener)`
+
+订阅生命周期事件。返回 `this` 以支持链式调用。
+
+| Event | Listener | Description |
+|---|---|---|
+| `"connected"` | `() => void` | 认证成功后触发 |
+| `"disconnected"` | `() => void` | 连接关闭时触发 |
+| `"error"` | `(error: Error) => void` | 认证失败、连接错误或解析错误时触发 |
+
+---
+
+## TaskContext
+
+传递给 `onTask` 处理函数的对象。
+
+| Property | Type | Description |
+|---|---|---|
+| `taskId` | `string` | 服务器分配的唯一任务 ID |
+| `conversationId` | `string` | 该任务所属的对话 ID |
+| `content` | `string` | 用户发送的消息文本 |
+
+### 方法
+
+#### `task.sendChunk(chunk)`
+
+向用户发送一个流式文本分块。
+
+```ts
+task.sendChunk("Processing...\n");
+```
+
+**参数：**
+- `chunk`（`string`）-- 要发送的文本分块
+
+#### `task.sendComplete(content)`
+
+标记任务完成，并附带完整响应内容。
+
+```ts
+task.sendComplete("Here is your answer.");
+```
+
+**参数：**
+- `content`（`string`）-- 完整的响应文本
+
+#### `task.sendError(error)`
+
+标记任务失败，并附带错误信息。
+
+```ts
+task.sendError("Something went wrong.");
+```
+
+**参数：**
+- `error`（`string`）-- 错误信息
+
+---
+
+## 类型定义
+
+### AgentSkill
+
+为 Agent 声明一个技能（斜杠命令）。
+
+```ts
+interface AgentSkill {
+  /** Unique skill identifier (used as slash command, e.g. "draw") */
+  id: string;
+  /** Human-readable skill name */
+  name: string;
+  /** Short description of what the skill does */
+  description: string;
+}
+```
+
+### ArinovaAgentOptions
+
+`ArinovaAgent` 构造函数的配置选项。
+
+```ts
+interface ArinovaAgentOptions {
+  serverUrl: string;
+  botToken: string;
+  skills?: AgentSkill[];
+  reconnectInterval?: number;
+  pingInterval?: number;
+}
+```
+
+### TaskHandler
+
+任务处理函数的类型签名。
+
+```ts
+type TaskHandler = (task: TaskContext) => void | Promise<void>;
+```
+
+### AgentEvent
+
+可监听的事件类型。
+
+```ts
+type AgentEvent = "connected" | "disconnected" | "error";
+```
+
+### AgentEventListener
+
+按事件类型映射的事件监听器签名。
+
+```ts
+type AgentEventListener<T extends AgentEvent> = T extends "error"
+  ? (error: Error) => void
+  : () => void;
+```

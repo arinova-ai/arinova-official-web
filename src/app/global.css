@@ -1,0 +1,9 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+:root {
+  --color-brand: #6366f1;
+  --color-brand-light: #818cf8;
+  --color-accent: #10b981;
+}

@@ -1,0 +1,141 @@
+---
+title: Core Concepts
+description: Understand how connections, tasks, streaming, and skills work
+---
+
+## Connection Lifecycle
+
+When your agent calls `connect()`, the following happens:
+
+```
+connect() → WebSocket open → Send auth (botToken)
+                                    │
+                              ┌─────┴──────┐
+                              │  auth_ok   │ → "connected" event → Ready for tasks
+                              │ auth_error │ → "error" event → Stop (no reconnect)
+                              └────────────┘
+```
+
+If the connection drops unexpectedly, the SDK automatically reconnects after `reconnectInterval` (default: 5 seconds). It does **not** reconnect on authentication errors.
+
+```ts
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+  reconnectInterval: 10_000, // 10 seconds between retries
+});
+```
+
+## Task Handling
+
+When a user sends a message to your agent, the server dispatches a **task**. Your `onTask` handler receives a `TaskContext` object:
+
+```ts
+agent.onTask(async (task) => {
+  console.log(task.taskId);          // Unique task ID
+  console.log(task.conversationId);  // Which conversation
+  console.log(task.content);         // The user's message
+
+  // Respond
+  task.sendComplete("Done!");
+});
+```
+
+Each task represents one user message. You must respond with either `sendComplete()` or `sendError()`.
+
+If your handler throws an exception, the SDK automatically calls `sendError()` with the error message.
+
+## Streaming Responses
+
+For long-running tasks, you can stream chunks to the user in real-time. This gives the user instant feedback instead of waiting for the full response.
+
+```ts
+agent.onTask(async (task) => {
+  task.sendChunk("Thinking...\n\n");
+
+  // Simulate streaming from an LLM
+  for (const word of ["Hello", " ", "world", "!"]) {
+    task.sendChunk(word);
+    await sleep(100);
+  }
+
+  task.sendComplete("Hello world!");
+});
+```
+
+- **`sendChunk(chunk)`** — Sends a partial response. The user sees it appear incrementally.
+- **`sendComplete(content)`** — Marks the task as done with the final full response.
+- **`sendError(error)`** — Marks the task as failed with an error message.
+
+The `content` passed to `sendComplete` is the **full final response**, not just the last chunk.
+
+## Skills
+
+Skills let your agent declare slash commands that users can invoke directly.
+
+```ts
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+  skills: [
+    {
+      id: "translate",
+      name: "Translate",
+      description: "Translate text to another language",
+    },
+    {
+      id: "summarize",
+      name: "Summarize",
+      description: "Summarize a long text",
+    },
+  ],
+});
+```
+
+When a user types `/translate Hello world`, your agent receives a task with `content` set to `"Hello world"`. The skill metadata is sent to the server during authentication and displayed as available commands in the UI.
+
+## Keep-Alive
+
+The SDK sends periodic ping messages to keep the WebSocket connection alive. You can configure the interval:
+
+```ts
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+  pingInterval: 30_000, // default: 30 seconds
+});
+```
+
+## Error Handling
+
+Handle errors at two levels:
+
+**1. Agent-level errors** — connection failures, auth errors, parse errors:
+
+```ts
+agent.on("error", (err) => {
+  console.error("Agent error:", err.message);
+});
+```
+
+**2. Task-level errors** — caught automatically if your handler throws:
+
+```ts
+agent.onTask(async (task) => {
+  // If this throws, the SDK calls task.sendError() automatically
+  const result = await riskyOperation();
+  task.sendComplete(result);
+});
+```
+
+You can also call `sendError()` manually:
+
+```ts
+agent.onTask(async (task) => {
+  if (!task.content.trim()) {
+    task.sendError("Please provide a message.");
+    return;
+  }
+  // ...
+});
+```

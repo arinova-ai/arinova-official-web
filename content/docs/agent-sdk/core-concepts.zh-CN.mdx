@@ -1,0 +1,141 @@
+---
+title: 核心概念
+description: 了解连接、任务、流式传输和技能的工作原理
+---
+
+## 连接生命周期
+
+当你的 Agent 调用 `connect()` 时，会经历以下流程：
+
+```
+connect() → WebSocket open → Send auth (botToken)
+                                    │
+                              ┌─────┴──────┐
+                              │  auth_ok   │ → "connected" event → Ready for tasks
+                              │ auth_error │ → "error" event → Stop (no reconnect)
+                              └────────────┘
+```
+
+如果连接意外断开，SDK 会在 `reconnectInterval`（默认 5 秒）后自动重连。但在认证错误的情况下，SDK **不会**尝试重连。
+
+```ts
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+  reconnectInterval: 10_000, // 10 seconds between retries
+});
+```
+
+## 任务处理
+
+当用户向你的 Agent 发送消息时，服务器会派发一个**任务**。你的 `onTask` 处理函数会接收到一个 `TaskContext` 对象：
+
+```ts
+agent.onTask(async (task) => {
+  console.log(task.taskId);          // Unique task ID
+  console.log(task.conversationId);  // Which conversation
+  console.log(task.content);         // The user's message
+
+  // Respond
+  task.sendComplete("Done!");
+});
+```
+
+每个任务对应一条用户消息。你必须使用 `sendComplete()` 或 `sendError()` 来进行响应。
+
+如果你的处理函数抛出了异常，SDK 会自动调用 `sendError()` 并传入错误信息。
+
+## 流式响应
+
+对于耗时较长的任务，你可以将响应分块实时推送给用户。这样用户可以立即看到反馈，而无需等待完整响应生成完毕。
+
+```ts
+agent.onTask(async (task) => {
+  task.sendChunk("Thinking...\n\n");
+
+  // Simulate streaming from an LLM
+  for (const word of ["Hello", " ", "world", "!"]) {
+    task.sendChunk(word);
+    await sleep(100);
+  }
+
+  task.sendComplete("Hello world!");
+});
+```
+
+- **`sendChunk(chunk)`** -- 发送部分响应。用户会看到内容逐步出现。
+- **`sendComplete(content)`** -- 标记任务完成，并附带最终的完整响应。
+- **`sendError(error)`** -- 标记任务失败，并附带错误信息。
+
+传给 `sendComplete` 的 `content` 参数是**完整的最终响应**，而不仅仅是最后一个分块。
+
+## 技能
+
+技能允许你的 Agent 声明斜杠命令，用户可以直接调用这些命令。
+
+```ts
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+  skills: [
+    {
+      id: "translate",
+      name: "Translate",
+      description: "Translate text to another language",
+    },
+    {
+      id: "summarize",
+      name: "Summarize",
+      description: "Summarize a long text",
+    },
+  ],
+});
+```
+
+当用户输入 `/translate Hello world` 时，你的 Agent 会收到一个 `content` 为 `"Hello world"` 的任务。技能元数据会在认证过程中发送到服务器，并在 UI 中显示为可用命令。
+
+## 保活机制
+
+SDK 会定期发送 ping 消息以保持 WebSocket 连接活跃。你可以配置发送间隔：
+
+```ts
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+  pingInterval: 30_000, // default: 30 seconds
+});
+```
+
+## 错误处理
+
+错误处理可以在两个层面进行：
+
+**1. Agent 级别的错误** -- 连接失败、认证错误、解析错误：
+
+```ts
+agent.on("error", (err) => {
+  console.error("Agent error:", err.message);
+});
+```
+
+**2. 任务级别的错误** -- 如果处理函数抛出异常，SDK 会自动捕获：
+
+```ts
+agent.onTask(async (task) => {
+  // If this throws, the SDK calls task.sendError() automatically
+  const result = await riskyOperation();
+  task.sendComplete(result);
+});
+```
+
+你也可以手动调用 `sendError()`：
+
+```ts
+agent.onTask(async (task) => {
+  if (!task.content.trim()) {
+    task.sendError("Please provide a message.");
+    return;
+  }
+  // ...
+});
+```

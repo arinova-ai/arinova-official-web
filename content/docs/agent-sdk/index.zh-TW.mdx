@@ -1,0 +1,45 @@
+---
+title: Agent SDK
+description: 建構連接到 Arinova Chat 的 AI Agent
+---
+
+## 什麼是 Arinova？
+
+Arinova 是一個對話平台，讓人類與 AI Agent 互動溝通。你可以把它想像成一款即時通訊 App，但對話的對象不是其他人，而是能夠實際完成工作的 AI Agent。
+
+## 什麼是 Agent SDK？
+
+**Agent SDK**（`@arinova-ai/agent-sdk`）是一套 TypeScript 函式庫，讓你能夠建構 AI Agent 並將其連接到 Arinova Chat。你的 Agent 會接收使用者的訊息、進行處理，然後即時透過 WebSocket 將回應送回去。
+
+## 你可以建構什麼？
+
+- **對話式 AI** — 串接任何 LLM（OpenAI、Anthropic 等），讓使用者直接與之對話
+- **任務型 Agent** — 建構能執行特定任務的 Agent，例如程式碼審查、翻譯或資料分析
+- **多技能 Agent** — 建立擁有多種斜線指令的 Agent，對應不同的功能
+- **串流式 Agent** — 即時分段傳送回應，帶來自然流暢的聊天體驗
+
+## 快速範例
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+agent.onTask(async (task) => {
+  task.sendComplete(`You said: ${task.content}`);
+});
+
+await agent.connect();
+```
+
+## 下一步
+
+<Cards>
+  <Card title="快速開始" href="./getting-started" description="安裝 SDK，5 分鐘內建構你的第一個 Agent" />
+  <Card title="核心概念" href="./core-concepts" description="了解連線、任務、串流傳輸和技能的運作方式" />
+  <Card title="API 參考" href="./api-reference" description="所有類別與方法的完整 API 文件" />
+  <Card title="範例" href="./examples" description="常見使用情境的即用範例" />
+</Cards>

@@ -1,0 +1,77 @@
+---
+title: 快速開始
+description: 安裝 Agent SDK，5 分鐘內建構你的第一個 Agent
+---
+
+## 安裝
+
+```bash
+npm install @arinova-ai/agent-sdk
+```
+
+此 SDK 零依賴，適用於任何 Node.js 環境（v18 以上）。
+
+## 取得 Bot Token
+
+1. 開啟 [Arinova Chat](https://chat.arinova.ai) 控制台
+2. 前往你的 Bot 設定頁面（或建立一個新的 Bot）
+3. 從設定頁面複製 Bot Token
+
+請妥善保管你的 Bot Token。請使用環境變數，絕對不要將它提交到版本控制系統中。
+
+```bash
+# .env
+BOT_TOKEN=your-bot-token-here
+```
+
+## 建構你的第一個 Agent
+
+建立一個名為 `agent.ts` 的檔案：
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+// Handle incoming messages
+agent.onTask(async (task) => {
+  task.sendComplete(`Echo: ${task.content}`);
+});
+
+// Lifecycle events
+agent.on("connected", () => {
+  console.log("Agent connected!");
+});
+
+agent.on("error", (err) => {
+  console.error("Error:", err.message);
+});
+
+// Connect
+await agent.connect();
+console.log("Agent is running...");
+```
+
+## 執行
+
+```bash
+npx tsx agent.ts
+```
+
+你的 Agent 現在已經上線了。開啟 Arinova Chat，找到你的 Bot，送出一則訊息試試看，它會把你的訊息原樣回覆給你。
+
+## 剛才發生了什麼？
+
+1. **`new ArinovaAgent()`** — 使用你的伺服器網址和 Bot Token 建立了一個 Agent 實例
+2. **`agent.onTask()`** — 註冊了一個處理函式，每當使用者向你的 Agent 發送訊息時就會執行
+3. **`task.sendComplete()`** — 將最終回應送回給使用者
+4. **`agent.connect()`** — 透過 WebSocket 連線至 Arinova Chat 並完成驗證
+
+## 下一步
+
+- 了解[核心概念](./core-concepts)，例如串流傳輸和技能
+- 查閱 [API 參考](./api-reference)，瞭解所有可用的方法
+- 參考[範例](./examples)，探索更多進階用法

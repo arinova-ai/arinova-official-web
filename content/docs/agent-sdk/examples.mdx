@@ -1,0 +1,173 @@
+---
+title: Examples
+description: Practical examples for building agents with the Arinova Agent SDK
+---
+
+## Echo Bot
+
+The simplest possible agent — echoes back whatever the user sends.
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+agent.onTask(async (task) => {
+  task.sendComplete(`You said: ${task.content}`);
+});
+
+agent.on("connected", () => console.log("Echo bot is online!"));
+await agent.connect();
+```
+
+## LLM Integration (OpenAI)
+
+Connect your agent to OpenAI with streaming responses.
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+import OpenAI from "openai";
+
+const openai = new OpenAI();
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+agent.onTask(async (task) => {
+  const stream = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: task.content }],
+    stream: true,
+  });
+
+  let fullResponse = "";
+
+  for await (const chunk of stream) {
+    const text = chunk.choices[0]?.delta?.content ?? "";
+    if (text) {
+      fullResponse += text;
+      task.sendChunk(text);
+    }
+  }
+
+  task.sendComplete(fullResponse);
+});
+
+agent.on("connected", () => console.log("LLM agent is online!"));
+await agent.connect();
+```
+
+## Multi-Skill Agent
+
+An agent that declares multiple skills and handles them differently.
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+  skills: [
+    {
+      id: "translate",
+      name: "Translate",
+      description: "Translate text to English",
+    },
+    {
+      id: "summarize",
+      name: "Summarize",
+      description: "Summarize a long text",
+    },
+    {
+      id: "joke",
+      name: "Joke",
+      description: "Tell a random joke",
+    },
+  ],
+});
+
+agent.onTask(async (task) => {
+  // In a real agent, you'd parse which skill was invoked.
+  // For now, respond based on content patterns.
+  const content = task.content.toLowerCase();
+
+  if (content.includes("/translate")) {
+    const text = task.content.replace(/\/translate\s*/i, "");
+    task.sendChunk("Translating...\n\n");
+    // Call your translation API here
+    task.sendComplete(`Translation: ${text}`);
+  } else if (content.includes("/summarize")) {
+    const text = task.content.replace(/\/summarize\s*/i, "");
+    task.sendChunk("Summarizing...\n\n");
+    // Call your summarization API here
+    task.sendComplete(`Summary: ${text.slice(0, 100)}...`);
+  } else if (content.includes("/joke")) {
+    task.sendComplete(
+      "Why do programmers prefer dark mode? Because light attracts bugs."
+    );
+  } else {
+    task.sendComplete(
+      "I support /translate, /summarize, and /joke commands!"
+    );
+  }
+});
+
+agent.on("connected", () => console.log("Multi-skill agent is online!"));
+await agent.connect();
+```
+
+## Error Handling with Retry
+
+An agent with robust error handling and graceful degradation.
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+  reconnectInterval: 10_000, // 10 seconds
+});
+
+agent.onTask(async (task) => {
+  try {
+    if (!task.content.trim()) {
+      task.sendError("Please send a non-empty message.");
+      return;
+    }
+
+    task.sendChunk("Working on it...\n\n");
+
+    const result = await processMessage(task.content);
+    task.sendComplete(result);
+  } catch (err) {
+    // sendError is called automatically if you throw,
+    // but you can also handle it manually
+    const message = err instanceof Error ? err.message : "Unknown error";
+    task.sendError(`Sorry, something went wrong: ${message}`);
+  }
+});
+
+agent.on("connected", () => {
+  console.log("Agent connected successfully");
+});
+
+agent.on("disconnected", () => {
+  console.log("Agent disconnected, will reconnect automatically...");
+});
+
+agent.on("error", (err) => {
+  console.error("Agent error:", err.message);
+});
+
+await agent.connect();
+
+async function processMessage(content: string): Promise<string> {
+  // Your business logic here
+  return `Processed: ${content}`;
+}
+```

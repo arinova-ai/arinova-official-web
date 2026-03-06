@@ -1,0 +1,173 @@
+---
+title: 示例
+description: 使用 Arinova Agent SDK 构建 Agent 的实用示例
+---
+
+## Echo Bot
+
+最简单的 Agent -- 将用户发送的内容原样返回。
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+agent.onTask(async (task) => {
+  task.sendComplete(`You said: ${task.content}`);
+});
+
+agent.on("connected", () => console.log("Echo bot is online!"));
+await agent.connect();
+```
+
+## LLM 集成（OpenAI）
+
+将你的 Agent 连接到 OpenAI，支持流式响应。
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+import OpenAI from "openai";
+
+const openai = new OpenAI();
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+});
+
+agent.onTask(async (task) => {
+  const stream = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: task.content }],
+    stream: true,
+  });
+
+  let fullResponse = "";
+
+  for await (const chunk of stream) {
+    const text = chunk.choices[0]?.delta?.content ?? "";
+    if (text) {
+      fullResponse += text;
+      task.sendChunk(text);
+    }
+  }
+
+  task.sendComplete(fullResponse);
+});
+
+agent.on("connected", () => console.log("LLM agent is online!"));
+await agent.connect();
+```
+
+## 多技能 Agent
+
+一个声明了多个技能并分别处理的 Agent。
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+  skills: [
+    {
+      id: "translate",
+      name: "Translate",
+      description: "Translate text to English",
+    },
+    {
+      id: "summarize",
+      name: "Summarize",
+      description: "Summarize a long text",
+    },
+    {
+      id: "joke",
+      name: "Joke",
+      description: "Tell a random joke",
+    },
+  ],
+});
+
+agent.onTask(async (task) => {
+  // In a real agent, you'd parse which skill was invoked.
+  // For now, respond based on content patterns.
+  const content = task.content.toLowerCase();
+
+  if (content.includes("/translate")) {
+    const text = task.content.replace(/\/translate\s*/i, "");
+    task.sendChunk("Translating...\n\n");
+    // Call your translation API here
+    task.sendComplete(`Translation: ${text}`);
+  } else if (content.includes("/summarize")) {
+    const text = task.content.replace(/\/summarize\s*/i, "");
+    task.sendChunk("Summarizing...\n\n");
+    // Call your summarization API here
+    task.sendComplete(`Summary: ${text.slice(0, 100)}...`);
+  } else if (content.includes("/joke")) {
+    task.sendComplete(
+      "Why do programmers prefer dark mode? Because light attracts bugs."
+    );
+  } else {
+    task.sendComplete(
+      "I support /translate, /summarize, and /joke commands!"
+    );
+  }
+});
+
+agent.on("connected", () => console.log("Multi-skill agent is online!"));
+await agent.connect();
+```
+
+## 错误处理与重试
+
+一个具备完善错误处理和优雅降级能力的 Agent。
+
+```ts
+import { ArinovaAgent } from "@arinova-ai/agent-sdk";
+
+const agent = new ArinovaAgent({
+  serverUrl: "wss://chat.arinova.ai",
+  botToken: process.env.BOT_TOKEN!,
+  reconnectInterval: 10_000, // 10 seconds
+});
+
+agent.onTask(async (task) => {
+  try {
+    if (!task.content.trim()) {
+      task.sendError("Please send a non-empty message.");
+      return;
+    }
+
+    task.sendChunk("Working on it...\n\n");
+
+    const result = await processMessage(task.content);
+    task.sendComplete(result);
+  } catch (err) {
+    // sendError is called automatically if you throw,
+    // but you can also handle it manually
+    const message = err instanceof Error ? err.message : "Unknown error";
+    task.sendError(`Sorry, something went wrong: ${message}`);
+  }
+});
+
+agent.on("connected", () => {
+  console.log("Agent connected successfully");
+});
+
+agent.on("disconnected", () => {
+  console.log("Agent disconnected, will reconnect automatically...");
+});
+
+agent.on("error", (err) => {
+  console.error("Agent error:", err.message);
+});
+
+await agent.connect();
+
+async function processMessage(content: string): Promise<string> {
+  // Your business logic here
+  return `Processed: ${content}`;
+}
+```
