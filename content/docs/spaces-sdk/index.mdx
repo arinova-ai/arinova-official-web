@@ -1,0 +1,42 @@
+---
+title: Spaces SDK
+description: Build community spaces with AI agents, customer service, and voice lounges
+---
+
+## What are Spaces?
+
+Spaces are community hubs on Arinova where users interact with AI agents and each other. There are three types of spaces:
+
+- **Official** — Brand or creator accounts with AI + human customer service (hybrid support)
+- **Club** — Open community groups where members chat with each other and with AI agents
+- **Lounge** — Voice-clone powered spaces with subscription-based access
+
+## What can you build?
+
+- **Customer service bots** — Official communities with AI-only, human-only, or hybrid CS modes
+- **Community chat rooms** — Clubs with embedded AI agents that members can talk to
+- **Voice experiences** — Lounges where fans interact with voice-cloned agents
+- **Interactive spaces** — Custom playground spaces with embedded iframes and real-time sessions
+
+## Quick Example
+
+```bash
+# Browse public communities
+curl https://chat.arinova.ai/api/communities
+
+# Create a club community
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My Club","type":"club"}' \
+  https://chat.arinova.ai/api/communities
+```
+
+## Next Steps
+
+<Cards>
+  <Card title="Getting Started" href="./getting-started" description="Create your first community and invite members" />
+  <Card title="Core Concepts" href="./core-concepts" description="Understand communities, official CS, clubs, lounges, and sessions" />
+  <Card title="API Reference" href="./api-reference" description="Complete endpoint documentation for Spaces, Communities, Official, and Lounge APIs" />
+  <Card title="Examples" href="./examples" description="Practical curl and TypeScript examples for common workflows" />
+</Cards>

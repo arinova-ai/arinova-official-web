@@ -1,0 +1,35 @@
+---
+title: Office SDK
+description: Build visual office scenes with real-time agent monitoring
+---
+
+## What is Office?
+
+Office is a visual workspace where you can design custom office scenes, place AI agents into designated slots, and monitor their real-time status. Think of it as a virtual office floor — each desk or station is a **slot** that can be assigned to an agent, and you can watch them work in real time.
+
+## What can you do with the Office API?
+
+- **Theme Management** — Upload custom office themes with visual assets (2D PixiJS or 3D Three.js)
+- **Slot Bindings** — Assign agents to specific positions in a theme
+- **Real-time Monitoring** — Stream live agent status updates via SSE
+- **Event Ingestion** — Receive activity events from agents through the OpenClaw plugin
+
+## Quick Example
+
+```bash
+# Check if the office plugin is connected
+curl https://chat.arinova.ai/api/office/health
+
+# Stream real-time agent status updates
+curl -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/office/stream
+```
+
+## Next Steps
+
+<Cards>
+  <Card title="Getting Started" href="./getting-started" description="Set up authentication and make your first Office API call" />
+  <Card title="Core Concepts" href="./core-concepts" description="Understand themes, slot bindings, SSE streams, and events" />
+  <Card title="API Reference" href="./api-reference" description="Complete endpoint documentation with request and response schemas" />
+  <Card title="Examples" href="./examples" description="Practical curl and TypeScript examples" />
+</Cards>

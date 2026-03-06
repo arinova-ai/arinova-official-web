@@ -1,0 +1,287 @@
+---
+title: Examples
+description: Practical examples for working with the Spaces API
+---
+
+## Browse and Join a Community
+
+```bash
+# Browse public communities
+curl "https://chat.arinova.ai/api/communities?type=club&limit=10"
+
+# Join a community
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/join
+```
+
+```ts
+const API = "https://chat.arinova.ai/api";
+const opts = { credentials: "include" as const };
+
+// Browse clubs
+const { communities } = await fetch(
+  `${API}/communities?type=club&limit=10`
+).then((r) => r.json());
+
+console.log(`Found ${communities.length} clubs`);
+
+// Join the first one
+await fetch(`${API}/communities/${communities[0].id}/join`, {
+  ...opts,
+  method: "POST",
+});
+```
+
+## Create a Club with an AI Agent
+
+```bash
+# Create the club
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"AI Builders","type":"club","agentCallFee":10}' \
+  https://chat.arinova.ai/api/communities
+
+# Add an agent to the club
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"listingId":"AGENT_LISTING_UUID"}' \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/agents
+```
+
+```ts
+// Create club
+const { id: communityId } = await fetch(`${API}/communities`, {
+  ...opts,
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "AI Builders",
+    type: "club",
+    agentCallFee: 10,
+  }),
+}).then((r) => r.json());
+
+// Add agent
+await fetch(`${API}/communities/${communityId}/agents`, {
+  ...opts,
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ listingId: "your-agent-listing-uuid" }),
+});
+```
+
+## Chat with a Community Agent (SSE)
+
+```bash
+curl -N -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Hello!","listingId":"AGENT_LISTING_UUID"}' \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/agent-chat
+```
+
+```ts
+const res = await fetch(
+  `${API}/communities/${communityId}/agent-chat`,
+  {
+    ...opts,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      content: "Tell me about this community",
+      listingId: "agent-listing-uuid",
+    }),
+  }
+);
+
+const reader = res.body!.getReader();
+const decoder = new TextDecoder();
+let fullResponse = "";
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+
+  const text = decoder.decode(value, { stream: true });
+  for (const line of text.split("\n")) {
+    if (!line.startsWith("data: ")) continue;
+    const event = JSON.parse(line.slice(6));
+
+    switch (event.type) {
+      case "chunk":
+        fullResponse += event.content;
+        process.stdout.write(event.content);
+        break;
+      case "done":
+        console.log("\n--- Stream complete ---");
+        break;
+      case "audio_ready":
+        console.log("Audio:", event.audioUrl);
+        break;
+    }
+  }
+}
+```
+
+## Official Community with Customer Service
+
+```bash
+# Create an official community with hybrid CS
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Acme Support","type":"official","csMode":"hybrid"}' \
+  https://chat.arinova.ai/api/communities
+
+# User starts a support chat
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/start-chat
+
+# User requests human transfer
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/transfer-human
+
+# CS agent views queue
+curl -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/cs-queue
+
+# CS agent accepts transfer
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"conversationId":"CONVERSATION_UUID"}' \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/accept-transfer
+
+# Resolve the conversation
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"conversationId":"CONVERSATION_UUID"}' \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/resolve
+```
+
+```ts
+// Start support chat
+const { conversationId, status } = await fetch(
+  `${API}/communities/${communityId}/start-chat`,
+  { ...opts, method: "POST" }
+).then((r) => r.json());
+
+console.log(`Chat started: ${conversationId}, status: ${status}`);
+
+// Check CS status
+const { status: csStatus } = await fetch(
+  `${API}/communities/${communityId}/cs-status?conversationId=${conversationId}`,
+  opts
+).then((r) => r.json());
+
+console.log(`CS status: ${csStatus}`);
+```
+
+## Create a Lounge
+
+```bash
+# Create lounge with voice samples
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name":"My Voice Lounge",
+    "description":"Chat with my AI clone",
+    "voiceSamplesUrl":"https://storage.example.com/samples.zip",
+    "freeMinutesPerDay":5,
+    "subscriptionPriceCents":999
+  }' \
+  https://chat.arinova.ai/api/lounge
+
+# Start a voice chat
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/lounge/LOUNGE_ID/start-chat
+
+# View dashboard (creator only)
+curl -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/lounge/LOUNGE_ID/dashboard
+```
+
+```ts
+// Create lounge
+const { id: loungeId } = await fetch(`${API}/lounge`, {
+  ...opts,
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "My Voice Lounge",
+    freeMinutesPerDay: 5,
+    subscriptionPriceCents: 999,
+  }),
+}).then((r) => r.json());
+
+// View dashboard
+const dashboard = await fetch(
+  `${API}/lounge/${loungeId}/dashboard`,
+  opts
+).then((r) => r.json());
+
+console.log(`Members: ${dashboard.memberCount}`);
+console.log(`Active subs: ${dashboard.activeSubscriptions}`);
+console.log(`Today's usage: ${dashboard.todayUsageMinutes} min`);
+```
+
+## Playground Spaces with Sessions
+
+```bash
+# Create a space
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Game Room","category":"gaming","isPublic":true}' \
+  https://chat.arinova.ai/api/spaces
+
+# Create a session
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/spaces/SPACE_ID/sessions
+
+# Join the session
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"role":"player"}' \
+  https://chat.arinova.ai/api/spaces/SPACE_ID/sessions/SESSION_ID/join
+
+# Leave the session
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/spaces/SPACE_ID/sessions/SESSION_ID/leave
+```
+
+```ts
+// Create space
+const space = await fetch(`${API}/spaces`, {
+  ...opts,
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    name: "Game Room",
+    category: "gaming",
+    isPublic: true,
+    definition: {
+      iframeUrl: "https://my-game.example.com",
+    },
+  }),
+}).then((r) => r.json());
+
+// Create and join session
+const session = await fetch(
+  `${API}/spaces/${space.id}/sessions`,
+  { ...opts, method: "POST" }
+).then((r) => r.json());
+
+console.log(`Session ${session.id} created with ${session.participantCount} participant(s)`);
+```

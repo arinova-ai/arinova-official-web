@@ -1,0 +1,695 @@
+---
+title: API Reference
+description: Complete endpoint documentation for Spaces, Communities, Official, and Lounge APIs
+---
+
+## Spaces
+
+### GET /api/spaces
+
+Browse public spaces with pagination and filtering.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `search` | `string` | — | Search by name |
+| `category` | `string` | — | Filter by category |
+| `page` | `number` | `1` | Page number |
+| `limit` | `number` | `20` | Results per page (max 50) |
+
+**Response (200):**
+
+```json
+{
+  "spaces": [
+    {
+      "id": "uuid",
+      "ownerId": "uuid",
+      "name": "My Space",
+      "description": "...",
+      "category": "gaming",
+      "tags": ["fun", "multiplayer"],
+      "definition": {},
+      "isPublic": true,
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ],
+  "total": 100,
+  "page": 1,
+  "totalPages": 5
+}
+```
+
+---
+
+### POST /api/spaces
+
+Create a new space. Requires session auth.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | Yes | Space name |
+| `description` | `string` | No | Description |
+| `category` | `string` | No | Category tag |
+| `tags` | `string[]` | No | Array of tags |
+| `definition` | `object` | No | Custom config (can include `iframeUrl`) |
+| `isPublic` | `boolean` | No | Whether the space is publicly visible |
+
+**Validation:** If `definition.iframeUrl` is provided, it must be a valid HTTPS URL.
+
+**Response (201):** The created SpaceRow.
+
+---
+
+### GET /api/spaces/\{id\}
+
+Get space details including owner info and sessions. Requires session auth.
+
+**Response (200):**
+
+```json
+{
+  "id": "uuid",
+  "ownerId": "uuid",
+  "name": "My Space",
+  "description": "...",
+  "category": "gaming",
+  "tags": [],
+  "definition": {},
+  "isPublic": true,
+  "createdAt": "...",
+  "updatedAt": "...",
+  "owner": { "id": "uuid", "name": "Alice", "image": "https://..." },
+  "sessions": []
+}
+```
+
+---
+
+### DELETE /api/spaces/\{id\}
+
+Delete a space. Requires session auth. Only the owner can delete.
+
+**Response:** `204 No Content`
+
+---
+
+### POST /api/spaces/\{id\}/sessions
+
+Create a session in a space. Requires session auth. The creator is auto-joined as the first participant.
+
+**Response (201):**
+
+```json
+{
+  "id": "session-uuid",
+  "playgroundId": "space-uuid",
+  "status": "waiting",
+  "participantCount": 1
+}
+```
+
+---
+
+### GET /api/spaces/\{id\}/sessions
+
+List all sessions for a space. Requires session auth.
+
+**Response (200):** Array of session rows with participant counts.
+
+---
+
+### POST /api/spaces/\{id\}/sessions/\{session_id\}/join
+
+Join a session. Requires session auth. Reconnects if already a participant.
+
+**Request Body (optional):**
+
+| Field | Type | Description |
+|---|---|---|
+| `agentId` | `string` | UUID of an agent to join as |
+| `role` | `string` | Participant role |
+| `controlMode` | `string` | Control mode |
+
+**Response (200/201):**
+
+```json
+{
+  "id": "participant-uuid",
+  "isConnected": true
+}
+```
+
+---
+
+### POST /api/spaces/\{id\}/sessions/\{session_id\}/leave
+
+Leave a session. Requires session auth. Marks participant as disconnected.
+
+**Response:** `204 No Content`
+
+---
+
+## Communities
+
+### GET /api/communities
+
+Browse active communities. No auth required.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `type` | `string` | — | Filter by `official` or `club` |
+| `category` | `string` | — | Filter by category |
+| `search` | `string` | — | Search by name |
+| `page` | `number` | `1` | Page number |
+| `limit` | `number` | `20` | Results per page (max 50) |
+
+**Response (200):**
+
+```json
+{
+  "communities": [],
+  "total": 0
+}
+```
+
+---
+
+### POST /api/communities
+
+Create a community. Requires session auth.
+
+**Request Body:**
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `name` | `string` | Yes | — | Community name (1-100 chars) |
+| `description` | `string` | No | — | Description |
+| `type` | `string` | No | `"club"` | `"official"` or `"club"` |
+| `joinFee` | `number` | No | `0` | One-time join fee |
+| `monthlyFee` | `number` | No | `0` | Monthly subscription fee |
+| `agentCallFee` | `number` | No | `0` | Per-interaction agent fee |
+| `category` | `string` | No | — | Category tag |
+| `avatarUrl` | `string` | No | — | Community avatar URL |
+| `csMode` | `string` | No | `"ai_only"` | CS mode: `"ai_only"`, `"human_only"`, `"hybrid"` |
+| `defaultAgentListingId` | `string` | No | — | Default agent listing UUID |
+
+**Response (201):**
+
+```json
+{ "id": "community-uuid" }
+```
+
+---
+
+### GET /api/communities/\{id\}
+
+Get community details. No auth required.
+
+**Response (200):** Full community row with all fields.
+
+---
+
+### PUT /api/communities/\{id\}
+
+Update community details. Requires session auth. Creator only.
+
+**Request Body:** Same fields as POST (all optional). Fees must be non-negative.
+
+**Response (200):** `{ "success": true }`
+
+---
+
+### DELETE /api/communities/\{id\}
+
+Soft-delete a community (sets status to `archived`). Requires session auth. Creator only.
+
+**Response (200):** `{ "success": true }`
+
+---
+
+### POST /api/communities/\{id\}/join
+
+Join a community. Requires session auth. Charges join fee + monthly fee if applicable.
+
+**Response (200):** `{ "success": true }`
+
+**Errors:**
+- `402 Payment Required` — Insufficient balance
+- `409 Conflict` — Already a member
+
+---
+
+### POST /api/communities/\{id\}/leave
+
+Leave a community. Requires session auth. Creator cannot leave.
+
+**Response (200):** `{ "success": true }`
+
+---
+
+### GET /api/communities/\{id\}/members
+
+List community members. No auth required.
+
+**Response (200):**
+
+```json
+{
+  "members": [
+    {
+      "id": "uuid",
+      "userId": "uuid",
+      "role": "creator",
+      "joinedAt": "...",
+      "subscriptionStatus": "active",
+      "userName": "Alice",
+      "userImage": "https://..."
+    }
+  ]
+}
+```
+
+---
+
+### POST /api/communities/\{id\}/agents
+
+Add an agent to the community. Requires session auth. Creator only.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `listingId` | `string` | Yes | Agent listing UUID |
+
+**Response (201):** `{ "success": true }`
+
+---
+
+### DELETE /api/communities/\{id\}/agents/\{listing_id\}
+
+Remove an agent from the community. Requires session auth. Creator only.
+
+**Response (200):** `{ "success": true }`
+
+---
+
+### GET /api/communities/\{id\}/agents
+
+List agents in a community. No auth required.
+
+**Response (200):**
+
+```json
+{
+  "agents": [
+    {
+      "id": "uuid",
+      "listingId": "uuid",
+      "agentName": "Assistant",
+      "avatarUrl": "https://...",
+      "description": "...",
+      "model": "gpt-4o",
+      "addedAt": "..."
+    }
+  ]
+}
+```
+
+---
+
+### POST /api/communities/\{id\}/messages
+
+Send a text message to the community. Requires session auth. Must be a member.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `content` | `string` | Yes | Message text (1-5000 chars) |
+
+**Response (201):**
+
+```json
+{
+  "id": "message-uuid",
+  "userId": "uuid",
+  "content": "Hello!",
+  "messageType": "text"
+}
+```
+
+---
+
+### POST /api/communities/\{id\}/agent-chat
+
+Chat with an AI agent in the community. Requires session auth. Must be a member. Charges `agentCallFee`. Returns SSE stream.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `content` | `string` | Yes | User message |
+| `listingId` | `string` | Yes | Agent listing UUID |
+
+**SSE Events:**
+
+| Event Type | Fields | Description |
+|---|---|---|
+| `meta` | `communityId`, `userMessageId` | Initial metadata |
+| `chunk` | `content` | Streamed response text |
+| `done` | — | Stream complete |
+| `audio_ready` | `audioUrl` | TTS audio URL (if available) |
+| `error` | `message` | Error occurred |
+
+**Errors:**
+- `402 Payment Required` — Insufficient balance
+
+---
+
+### GET /api/communities/\{id\}/messages
+
+Get community message history. Requires session auth. Must be a member. Cursor-based pagination.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `before` | `string` | — | ISO datetime cursor (fetch messages before this time) |
+| `limit` | `number` | `50` | Results per page (max 100) |
+
+**Response (200):**
+
+```json
+{
+  "messages": [
+    {
+      "id": "uuid",
+      "userId": "uuid",
+      "agentListingId": null,
+      "content": "Hello!",
+      "messageType": "text",
+      "createdAt": "...",
+      "userName": "Alice",
+      "userImage": "https://...",
+      "agentName": null,
+      "ttsAudioUrl": null
+    }
+  ]
+}
+```
+
+---
+
+### GET /api/communities/my
+
+List communities created by the authenticated user. Requires session auth.
+
+**Response (200):** `{ "communities": [...] }`
+
+---
+
+### GET /api/communities/joined
+
+List communities the authenticated user has joined. Requires session auth.
+
+**Response (200):** `{ "communities": [...] }`
+
+---
+
+## Official (Customer Service)
+
+### POST /api/communities/\{id\}/start-chat
+
+Start a 1-on-1 conversation with an official community. Requires session auth. Reuses existing conversation if one exists.
+
+**Response (200/201):**
+
+```json
+{
+  "conversationId": "uuid",
+  "existing": false,
+  "status": "ai_active"
+}
+```
+
+The initial status depends on the community's `csMode`:
+- `human_only` → `"waiting_human"`
+- Others → `"ai_active"`
+
+---
+
+### POST /api/communities/\{id\}/transfer-human
+
+Request transfer from AI to a human agent. Requires session auth.
+
+**Response (200):** `{ "status": "waiting_human" }`
+
+---
+
+### POST /api/communities/\{id\}/accept-transfer
+
+CS agent accepts a transfer. Requires session auth. Must be creator, moderator, or CS agent.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `conversationId` | `string` | Yes | Conversation UUID |
+
+**Response (200):** `{ "status": "human_active" }`
+
+---
+
+### POST /api/communities/\{id\}/resolve
+
+Mark a conversation as resolved. Requires session auth. Can be called by the user, assigned CS agent, creator, or moderator.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `conversationId` | `string` | Yes | Conversation UUID |
+
+**Response (200):** `{ "status": "resolved" }`
+
+---
+
+### GET /api/communities/\{id\}/cs-status
+
+Get the CS status of a conversation. Requires session auth.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `conversationId` | `string` | Yes | Conversation UUID |
+
+**Response (200):**
+
+```json
+{ "status": "ai_active" }
+```
+
+Possible values: `"ai_active"`, `"waiting_human"`, `"human_active"`, `"resolved"`, `"none"`
+
+---
+
+### GET /api/communities/\{id\}/cs-queue
+
+View the CS queue. Requires session auth. Must be creator, moderator, or CS agent.
+
+**Response (200):**
+
+```json
+{
+  "queue": [
+    {
+      "id": "uuid",
+      "conversationId": "uuid",
+      "userId": "uuid",
+      "status": "waiting_human",
+      "assignedCsId": null,
+      "userName": "Alice",
+      "userImage": "https://...",
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ]
+}
+```
+
+Queue is ordered by priority: `waiting_human` > `human_active` > `ai_active` > `resolved`.
+
+---
+
+### POST /api/communities/\{id\}/invite-cs
+
+Invite a user as a CS agent. Requires session auth. Must be creator or moderator.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `userId` | `string` | Yes | User ID to invite |
+
+**Response (200):** `{ "success": true }`
+
+---
+
+### POST /api/communities/\{id\}/verify
+
+Submit a verification request. Requires session auth. Creator only.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `businessName` | `string` | No | Business name |
+| `businessRegistration` | `string` | No | Business registration number |
+| `documentsUrl` | `string` | No | URL to verification documents |
+
+**Response (201):**
+
+```json
+{ "requestId": "uuid" }
+```
+
+---
+
+## Lounge
+
+### POST /api/lounge
+
+Create a lounge community. Requires session auth.
+
+**Request Body:**
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `name` | `string` | Yes | — | Lounge name (1-100 chars) |
+| `description` | `string` | No | — | Description |
+| `avatarUrl` | `string` | No | — | Avatar URL |
+| `voiceSamplesUrl` | `string` | No | — | URL to voice samples for cloning |
+| `freeMinutesPerDay` | `number` | No | `5` | Free voice minutes per day |
+| `subscriptionPriceCents` | `number` | No | `0` | Monthly subscription price in cents |
+| `defaultAgentListingId` | `string` | No | — | Default agent listing UUID |
+
+**Response (201):**
+
+```json
+{ "id": "lounge-uuid" }
+```
+
+---
+
+### GET /api/lounge/\{id\}
+
+Get lounge details. No auth required.
+
+**Response (200):**
+
+```json
+{
+  "id": "uuid",
+  "creatorId": "uuid",
+  "name": "My Lounge",
+  "description": "...",
+  "avatarUrl": "https://...",
+  "memberCount": 10,
+  "voiceModelId": "model-id",
+  "voiceModelStatus": "ready",
+  "voiceSamplesUrl": "https://...",
+  "freeMinutesPerDay": 5,
+  "subscriptionPriceCents": 999,
+  "defaultAgentListingId": "uuid",
+  "createdAt": "...",
+  "creatorName": "Alice",
+  "creatorImage": "https://..."
+}
+```
+
+---
+
+### POST /api/lounge/\{id\}/start-chat
+
+Start a voice chat session with the lounge agent. Requires session auth. Auto-joins the user as a community member if not already a member. Reuses existing conversation.
+
+**Response (200/201):**
+
+```json
+{
+  "conversationId": "uuid",
+  "existing": false
+}
+```
+
+---
+
+### GET /api/lounge/\{id\}/dashboard
+
+Creator dashboard with lounge statistics. Requires session auth. Creator only.
+
+**Response (200):**
+
+```json
+{
+  "memberCount": 42,
+  "activeSubscriptions": 15,
+  "totalConversations": 200,
+  "todayUsageMinutes": 120
+}
+```
+
+---
+
+## Admin Endpoints
+
+### GET /api/admin/verification-requests
+
+List all verification requests. Requires admin auth.
+
+**Response (200):**
+
+```json
+{
+  "requests": [
+    {
+      "id": "uuid",
+      "communityId": "uuid",
+      "requesterId": "uuid",
+      "businessName": "Acme Inc",
+      "businessRegistration": "12345",
+      "documentsUrl": "https://...",
+      "status": "pending",
+      "reviewerNotes": null,
+      "communityName": "Acme Official",
+      "createdAt": "...",
+      "reviewedAt": null
+    }
+  ]
+}
+```
+
+---
+
+### PUT /api/admin/verification-requests/\{id\}
+
+Review a verification request. Requires admin auth.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `status` | `string` | Yes | `"approved"` or `"rejected"` |
+| `reviewerNotes` | `string` | No | Review notes |
+
+**Response (200):** `{ "success": true }`
+
+If approved, the community is automatically marked as verified.

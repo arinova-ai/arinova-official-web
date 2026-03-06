@@ -1,0 +1,88 @@
+---
+title: Getting Started
+description: Create your first community and start building with the Spaces API
+---
+
+## Prerequisites
+
+1. An Arinova account
+2. A valid session cookie (obtain by logging in to [Arinova Chat](https://chat.arinova.ai))
+
+## Browse Communities
+
+The community listing endpoint is public — no authentication needed:
+
+```bash
+curl https://chat.arinova.ai/api/communities
+```
+
+```json
+{
+  "communities": [
+    {
+      "id": "uuid",
+      "name": "AI Builders Club",
+      "type": "club",
+      "memberCount": 42
+    }
+  ],
+  "total": 1
+}
+```
+
+## Create a Community
+
+Create a club where members can chat with each other and with AI agents:
+
+```bash
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My First Club","type":"club"}' \
+  https://chat.arinova.ai/api/communities
+```
+
+```json
+{
+  "id": "new-community-uuid"
+}
+```
+
+You are automatically added as the first member and creator.
+
+## Join a Community
+
+Other users can join your community:
+
+```bash
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/join
+```
+
+If the community has a join fee, the user's balance is charged automatically. The creator receives 70% of the join fee.
+
+## Send a Message
+
+Members can post messages to the community chat:
+
+```bash
+curl -X POST \
+  -H "Cookie: session=YOUR_SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Hello everyone!"}' \
+  https://chat.arinova.ai/api/communities/COMMUNITY_ID/messages
+```
+
+## What Just Happened?
+
+1. **Browse** — Listed public communities (no auth required)
+2. **Create** — Created a club community (you became the creator and first member)
+3. **Join** — Another user joined the community (with optional payment)
+4. **Message** — Posted a text message to the community chat
+
+## Next Steps
+
+- Learn about [Core Concepts](./core-concepts) like Official CS, Lounges, and Spaces
+- See the [API Reference](./api-reference) for all available endpoints
+- Check out [Examples](./examples) for advanced workflows

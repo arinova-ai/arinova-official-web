@@ -1,0 +1,104 @@
+---
+title: Core Concepts
+description: Understand communities, official CS, clubs, lounges, and sessions
+---
+
+## Communities
+
+A **community** is the foundational entity in Spaces. Every community has a type that determines its behavior:
+
+| Type | Purpose | Key Features |
+|---|---|---|
+| `official` | Brand / creator accounts | AI + human customer service, verification |
+| `club` | Open community groups | Group chat, embedded AI agents |
+| `lounge` | Voice-clone spaces | Voice chat, subscriptions, usage tracking |
+
+Communities support:
+- **Join/leave** with optional fees (join fee + monthly subscription)
+- **Agent integration** — Add AI agent listings that members can interact with
+- **Member management** — Creator, moderators, CS agents, and regular members
+
+### Billing Model
+
+- **Join fee**: One-time payment to enter. Creator receives 70%.
+- **Monthly fee**: Recurring subscription. If set, membership expires after 30 days.
+- **Agent call fee**: Per-interaction cost for AI agent chat. Creator receives 70%.
+
+## Official (Customer Service)
+
+Official communities provide a structured customer service system with three modes:
+
+| CS Mode | Behavior |
+|---|---|
+| `ai_only` | All conversations handled by AI |
+| `human_only` | All conversations start in `waiting_human` status |
+| `hybrid` | AI handles first, users can request human transfer |
+
+### Conversation Lifecycle
+
+```
+User starts chat
+    │
+    ├── ai_only ──→ [ai_active] ──→ [resolved]
+    │
+    ├── human_only ──→ [waiting_human] ──→ [human_active] ──→ [resolved]
+    │
+    └── hybrid ──→ [ai_active] ──→ transfer ──→ [waiting_human]
+                                                    │
+                                                    ├──→ [human_active] ──→ [resolved]
+                                                    └──→ [resolved]
+```
+
+Key roles:
+- **Creator / Moderator** — Can view CS queue, accept transfers, invite CS agents
+- **CS Agent** — Invited by creator/moderator, can accept transfers and resolve conversations
+- **User** — Can start chat, request human transfer, resolve their own conversation
+
+### Verification
+
+Official communities can submit verification requests with business documents. An admin reviews and approves or rejects the request. Approved communities are marked as verified.
+
+## Club
+
+Clubs are open community groups for casual interaction. Members can:
+
+- Send text messages to the group chat
+- Talk to AI agents embedded in the community via `agent-chat` (SSE streaming)
+- Browse message history with cursor-based pagination
+
+Agent chat streams responses in real-time via SSE with events: `meta`, `chunk`, `done`, `audio_ready`, and `error`.
+
+## Lounge
+
+Lounges are subscription-based spaces centered around voice interaction:
+
+- **Voice cloning** — Creators upload voice samples for AI voice synthesis
+- **Free tier** — Configurable free minutes per day (default: 5)
+- **Subscription** — Monthly price in cents for unlimited access
+- **Dashboard** — Creators can view member count, active subscriptions, conversations, and usage stats
+
+Starting a chat in a lounge automatically joins the user as a community member.
+
+## Spaces (Playgrounds)
+
+**Spaces** are customizable playground environments that can embed external content via iframes and host real-time collaborative sessions.
+
+- **Definition** — Each space has a JSON `definition` field (can include `iframeUrl` for embedded content)
+- **Sessions** — Real-time rooms where participants join, interact, and leave
+- **Participants** — Each session tracks connected participants with optional agent/role/control-mode metadata
+- **Visibility** — Spaces can be public or private, with optional categories and tags
+
+### Session Lifecycle
+
+```
+Creator creates session
+    │
+    ├── Creator auto-joins as first participant
+    │
+    ├── Others join via POST .../join
+    │     ├── New participant created
+    │     └── Or existing participant reconnected
+    │
+    └── Participants leave via POST .../leave
+          └── Marked as disconnected (not deleted)
+```

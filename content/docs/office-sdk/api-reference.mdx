@@ -1,0 +1,250 @@
+---
+title: API Reference
+description: Complete endpoint documentation for the Office API
+---
+
+## Office Endpoints
+
+### GET /api/office/health
+
+Lightweight health check. No authentication required.
+
+**Response:**
+
+```json
+{
+  "connected": true,
+  "timestamp": "2026-03-06T10:00:00Z"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `connected` | `boolean` | Whether the office plugin is connected |
+| `timestamp` | `string` | ISO 8601 timestamp |
+
+---
+
+### GET /api/office/status
+
+Returns a snapshot of all online agents. Requires session auth.
+
+**Response (200):**
+
+```json
+{
+  "connected": true,
+  "agents": [],
+  "timestamp": "2026-03-06T10:00:00Z"
+}
+```
+
+**Error (503):** Office plugin not connected.
+
+---
+
+### GET /api/office/stream
+
+Opens an SSE connection for real-time agent status updates. Requires session auth.
+
+The first event is a full snapshot. Subsequent events are incremental `InternalEvent` updates. The connection uses keep-alive to stay open.
+
+**Error (503):** Office plugin not connected.
+
+---
+
+### POST /api/office/event
+
+Receives activity events from agents. Requires **bot token** auth (`Authorization: Bearer <botToken>`).
+
+The server overwrites the `agent_id` in the payload with the authenticated agent's ID for security.
+
+**Request Body:** `InternalEvent` (from OpenClaw plugin)
+
+**Response:** `204 No Content`
+
+---
+
+### GET /api/office/bindings
+
+Retrieves slot bindings for a specific theme. Requires session auth.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `themeId` | `string` | Yes | Theme ID to query bindings for |
+
+**Response (200):**
+
+```json
+[
+  {
+    "slotIndex": 0,
+    "agentId": "uuid",
+    "agentName": "Assistant",
+    "agentAvatarUrl": "https://..."
+  }
+]
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `slotIndex` | `number` | Slot position index |
+| `agentId` | `string` | UUID of the bound agent |
+| `agentName` | `string \| null` | Agent display name |
+| `agentAvatarUrl` | `string \| null` | Agent avatar URL |
+
+---
+
+### PUT /api/office/bindings
+
+Assigns an agent to a slot. Requires session auth.
+
+Uses **move semantics** — if the agent is already in another slot of the same theme, it is removed from the old slot first.
+
+**Request Body:**
+
+```json
+{
+  "themeId": "cozy-office",
+  "slotIndex": 0,
+  "agentId": "agent-uuid"
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `themeId` | `string` | Yes | Target theme ID |
+| `slotIndex` | `number` | Yes | Target slot index |
+| `agentId` | `string` | Yes | UUID of the agent to bind |
+
+**Response (200):**
+
+```json
+{
+  "slotIndex": 0,
+  "agentId": "agent-uuid",
+  "themeId": "cozy-office"
+}
+```
+
+**Errors:**
+- `403 Forbidden` — Agent does not belong to the authenticated user
+- `409 Conflict` — Binding conflict
+
+---
+
+### DELETE /api/office/bindings/\{theme_id\}/\{slot_index\}
+
+Removes a slot binding. Requires session auth.
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `theme_id` | `string` | Theme ID |
+| `slot_index` | `number` | Slot index to unbind |
+
+**Response:** `204 No Content`
+
+---
+
+## Theme Endpoints
+
+### POST /api/themes/upload
+
+Uploads a theme package (manifest + asset bundle). Requires session auth. Uses `multipart/form-data`.
+
+**Multipart Fields:**
+
+| Field | Type | Max Size | Description |
+|---|---|---|---|
+| `manifest` | `text (JSON)` | 256 KB | Theme manifest (`theme.json` content) |
+| `bundle` | `file (ZIP)` | 200 MB | Asset bundle containing images, models, audio, etc. |
+
+**Manifest Schema:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | `string` | Yes | Kebab-case identifier (e.g. `my-theme`), max 100 chars |
+| `name` | `string` | Yes | Display name, max 100 chars |
+| `version` | `string` | Yes | Semver format (e.g. `1.0.0`) |
+| `renderer` | `string` | No | `"threejs"` for 3D themes; omit for PixiJS |
+| `room` | `object` | v3 only | 3D room configuration with `model` path |
+| `zones` | `array` | v2 only | 2D zone definitions |
+| `layers` | `array` | v2 only | 2D layer definitions |
+| `characters` | `object` | v2 only | Character sprite configuration |
+
+**Validation:**
+- v2 (PixiJS): `zones`, `layers`, and `characters` must be non-empty
+- v3 (Three.js): `renderer` must be `"threejs"` or `room.model` must be set
+- Bundle files must have allowed extensions (`png`, `jpg`, `jpeg`, `webp`, `gif`, `svg`, `glb`, `gltf`, `mp3`, `ogg`, `wav`, `json`)
+- No path traversal (`..` or absolute paths) in ZIP entries
+
+**Response (201):**
+
+```json
+{
+  "themeId": "cozy-office",
+  "name": "Cozy Office",
+  "version": "1.0.0"
+}
+```
+
+**Errors:**
+- `400 Bad Request` — Validation failure or size exceeded
+
+---
+
+### GET /api/themes
+
+Lists all installed themes. Requires session auth.
+
+**Response (200):**
+
+```json
+{
+  "themes": [
+    {
+      "id": "cozy-office",
+      "name": "Cozy Office",
+      "version": "1.0.0",
+      "description": "",
+      "renderer": "pixi"
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `string` | Theme identifier |
+| `name` | `string` | Display name |
+| `version` | `string` | Semver version |
+| `description` | `string` | Theme description |
+| `renderer` | `string` | `"pixi"` or `"threejs"` |
+
+---
+
+### DELETE /api/themes/\{themeId\}
+
+Deletes a theme and all its files. Requires session auth.
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `themeId` | `string` | Theme ID (kebab-case) |
+
+**Response (200):**
+
+```json
+{
+  "deleted": "cozy-office"
+}
+```
+
+**Errors:**
+- `400 Bad Request` — Invalid theme ID format
+- `404 Not Found` — Theme does not exist

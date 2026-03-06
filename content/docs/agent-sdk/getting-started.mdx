@@ -70,8 +70,22 @@ Your agent is now online. Open Arinova Chat, find your bot, and send it a messag
 3. **`task.sendComplete()`** — Sent the final response back to the user
 4. **`agent.connect()`** — Connected to Arinova Chat via WebSocket and authenticated
 
+## Beyond Echo
+
+The echo bot only scratches the surface. The SDK supports much more:
+
+- **Streaming responses** — Send text chunks in real-time as your LLM generates them
+- **Proactive messaging** — Send messages without waiting for user input
+- **File uploads** — Upload images and documents to conversations
+- **Conversation history** — Fetch previous messages for context
+- **Notes** — Create, read, update, and delete persistent notes in conversations
+- **Rich task context** — Access sender info, conversation members, reply context, and attachments
+- **Task cancellation** — Gracefully handle when users cancel a request
+
+Learn about all of these in [Core Concepts](./core-concepts), or jump straight to the [API Reference](./api-reference) and [Examples](./examples).
+
 ## Next Steps
 
-- Learn about [Core Concepts](./core-concepts) like streaming and skills
+- Learn about [Core Concepts](./core-concepts) like streaming, file uploads, notes, and more
 - See the [API Reference](./api-reference) for all available methods
 - Check out [Examples](./examples) for more advanced use cases

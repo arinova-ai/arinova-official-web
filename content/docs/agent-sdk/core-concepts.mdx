@@ -1,6 +1,6 @@
 ---
 title: Core Concepts
-description: Understand how connections, tasks, streaming, and skills work
+description: Understand how connections, tasks, streaming, files, notes, and more work
 ---
 
 ## Connection Lifecycle
@@ -8,12 +8,12 @@ description: Understand how connections, tasks, streaming, and skills work
 When your agent calls `connect()`, the following happens:
 
 ```
-connect() → WebSocket open → Send auth (botToken)
-                                    │
-                              ┌─────┴──────┐
-                              │  auth_ok   │ → "connected" event → Ready for tasks
-                              │ auth_error │ → "error" event → Stop (no reconnect)
-                              └────────────┘
+connect() -> WebSocket open -> Send auth (botToken)
+                                    |
+                              +-----+------+
+                              |  auth_ok   | -> "connected" event -> Ready for tasks
+                              | auth_error | -> "error" event -> Stop (no reconnect)
+                              +------------+
 ```
 
 If the connection drops unexpectedly, the SDK automatically reconnects after `reconnectInterval` (default: 5 seconds). It does **not** reconnect on authentication errors.
@@ -45,6 +45,31 @@ Each task represents one user message. You must respond with either `sendComplet
 
 If your handler throws an exception, the SDK automatically calls `sendError()` with the error message.
 
+## Rich Task Context
+
+The `TaskContext` object contains much more than just the message text. You can access detailed information about the sender, conversation, and message:
+
+```ts
+agent.onTask(async (task) => {
+  // Who sent the message
+  console.log(task.senderUserId);    // User ID of the sender
+  console.log(task.senderUsername);   // Username of the sender
+
+  // Conversation info
+  console.log(task.conversationType); // "dm", "group", or "community"
+  console.log(task.members);          // Array of conversation members
+
+  // Message context
+  console.log(task.replyTo);          // Reply context if this is a reply
+  console.log(task.attachments);      // File attachments on the message
+  console.log(task.history);          // Recent message history
+
+  task.sendComplete("Got it!");
+});
+```
+
+This rich context lets you build agents that respond differently based on who is talking, what conversation type they are in, and what files or messages they are referencing.
+
 ## Streaming Responses
 
 For long-running tasks, you can stream chunks to the user in real-time. This gives the user instant feedback instead of waiting for the full response.
@@ -68,6 +93,153 @@ agent.onTask(async (task) => {
 - **`sendError(error)`** — Marks the task as failed with an error message.
 
 The `content` passed to `sendComplete` is the **full final response**, not just the last chunk.
+
+### Mentions
+
+When sending a complete response, you can @mention specific users:
+
+```ts
+task.sendComplete("Here's the answer for you!", {
+  mentions: ["user-id-1", "user-id-2"],
+});
+```
+
+The `mentions` option accepts an array of user IDs. The mentioned users will be notified.
+
+## Proactive Messaging
+
+Your agent can send messages to conversations at any time — not just in response to tasks. This is useful for notifications, scheduled updates, or follow-up messages.
+
+```ts
+// Send a message to a conversation
+await agent.sendMessage(conversationId, "Hey! Just a reminder about your task.");
+```
+
+The SDK uses the WebSocket connection if available, and automatically falls back to HTTP POST if the WebSocket is not connected. This means proactive messaging works reliably even during brief disconnections.
+
+## File Uploads
+
+Agents can upload files (images, documents, etc.) to conversations. This is done via the agent upload endpoint which stores files in R2 cloud storage.
+
+### Using the agent-level method
+
+```ts
+import { readFile } from "fs/promises";
+
+const fileData = await readFile("/path/to/report.pdf");
+const result = await agent.uploadFile(
+  conversationId,
+  new Uint8Array(fileData),
+  "report.pdf",
+  "application/pdf" // optional — auto-detected from file extension
+);
+
+console.log(result.url);      // Public URL of the uploaded file
+console.log(result.fileName);  // "report.pdf"
+console.log(result.fileType);  // "application/pdf"
+console.log(result.fileSize);  // Size in bytes
+```
+
+### Using the task convenience method
+
+Inside a task handler, you can use `task.uploadFile()` which automatically fills in the `conversationId`:
+
+```ts
+agent.onTask(async (task) => {
+  const imageData = await generateChart();
+  const result = await task.uploadFile(
+    new Uint8Array(imageData),
+    "chart.png",
+    "image/png"
+  );
+  task.sendComplete(`Here's your chart: ![Chart](${result.url})`);
+});
+```
+
+### Image Auto-Upload
+
+When your agent sends a response containing markdown image syntax with a **local file path**, the SDK automatically uploads the file and replaces the path with the uploaded URL:
+
+```ts
+// The SDK detects the local path, uploads the file, and replaces it with a URL
+task.sendComplete("Here's the screenshot: ![Screenshot](/tmp/screenshot.png)");
+// Sent as: "Here's the screenshot: ![Screenshot](https://r2.example.com/uploaded-url.png)"
+```
+
+This only works with markdown image syntax (`![alt](path)`). Plain text paths like `"The file is at /tmp/screenshot.png"` are **not** auto-uploaded.
+
+Supported image formats: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`.
+
+## Conversation History
+
+Agents can fetch previous messages in a conversation to build context for their responses.
+
+### Using the agent-level method
+
+```ts
+const history = await agent.fetchHistory(conversationId, {
+  limit: 20,        // Number of messages to fetch (default varies by server)
+  before: messageId, // Fetch messages before this message ID
+  after: messageId,  // Fetch messages after this message ID
+  around: messageId, // Fetch messages around this message ID
+});
+
+console.log(history.messages);   // Array of message objects
+console.log(history.hasMore);    // Whether there are more messages
+console.log(history.nextCursor); // Cursor for the next page
+```
+
+### Using the task convenience method
+
+Inside a task handler, `task.fetchHistory()` automatically fills in the `conversationId`:
+
+```ts
+agent.onTask(async (task) => {
+  const history = await task.fetchHistory({ limit: 10 });
+  // Use history.messages to build context for your LLM
+  task.sendComplete("I've reviewed the conversation history.");
+});
+```
+
+### Embedded History
+
+The task context also includes a `history` property with recent messages already embedded by the server. This is useful for quick context without making an extra API call:
+
+```ts
+agent.onTask(async (task) => {
+  if (task.history && task.history.length > 0) {
+    console.log("Recent messages:", task.history);
+  }
+});
+```
+
+## Notes
+
+Notes are persistent documents attached to a conversation. Agents can create, read, update, and delete notes — useful for storing to-do lists, summaries, or any structured data.
+
+```ts
+// List all notes in a conversation
+const { notes, hasMore, nextCursor } = await agent.listNotes(conversationId, {
+  limit: 10,
+  before: cursor, // Pagination cursor
+});
+
+// Create a note
+const note = await agent.createNote(conversationId, {
+  title: "Meeting Summary",
+  content: "Key decisions:\n- Launch date: March 15\n- Budget: $50k",
+});
+
+// Update a note (only notes created by the agent)
+await agent.updateNote(conversationId, note.id, {
+  content: "Updated content here",
+});
+
+// Delete a note (only notes created by the agent)
+await agent.deleteNote(conversationId, note.id);
+```
+
+**Important:** Agents can only update or delete notes they created. Attempting to modify a note created by a user will result in an error.
 
 ## Skills
 
@@ -93,6 +265,39 @@ const agent = new ArinovaAgent({
 ```
 
 When a user types `/translate Hello world`, your agent receives a task with `content` set to `"Hello world"`. The skill metadata is sent to the server during authentication and displayed as available commands in the UI.
+
+## Task Cancellation
+
+Users can cancel an in-progress task. When this happens, the server sends a `cancel_task` event, and the SDK aborts the task via an `AbortSignal`.
+
+Your agent can listen for cancellation using the `task.signal` property:
+
+```ts
+agent.onTask(async (task) => {
+  // Check if cancelled before starting expensive work
+  if (task.signal.aborted) return;
+
+  // Pass the signal to fetch calls or other async operations
+  const response = await fetch("https://api.example.com/slow", {
+    signal: task.signal,
+  });
+
+  // Listen for cancellation during long operations
+  task.signal.addEventListener("abort", () => {
+    console.log("Task was cancelled by the user");
+  });
+
+  task.sendComplete("Done!");
+});
+```
+
+When a task is cancelled, the SDK automatically sends an error response (`"cancelled"`) to the server and cleans up the heartbeat timer. You do not need to call `sendError()` manually.
+
+## Task Heartbeat
+
+The SDK automatically sends periodic heartbeat messages to the server while a task is being processed (every 60 seconds). This tells the server your agent is still alive and working on the task.
+
+The heartbeat stops automatically when the task completes, fails, or is cancelled. No configuration is needed.
 
 ## Keep-Alive
 

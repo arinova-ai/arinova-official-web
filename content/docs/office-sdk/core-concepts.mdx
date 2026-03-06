@@ -1,0 +1,80 @@
+---
+title: Core Concepts
+description: Understand themes, slot bindings, SSE streams, and events
+---
+
+## Themes
+
+A **theme** defines the visual appearance of an office scene. Each theme is a package containing a `theme.json` manifest and an asset bundle (ZIP).
+
+Arinova supports two renderer types:
+
+- **PixiJS (v2)** — 2D scenes with zones, layers, and character sprites
+- **Three.js (v3)** — 3D scenes with a room model
+
+### Theme Manifest
+
+The `theme.json` manifest describes the theme metadata and structure:
+
+```json
+{
+  "id": "cozy-office",
+  "name": "Cozy Office",
+  "version": "1.0.0",
+  "zones": [{ "...": "zone definitions" }],
+  "layers": [{ "...": "layer definitions" }],
+  "characters": { "...": "character config" }
+}
+```
+
+For 3D themes, set `renderer: "threejs"` and include a `room` object with a `model` path.
+
+### Upload Constraints
+
+- Manifest: max **256 KB**
+- Bundle (ZIP): max **200 MB**
+- Allowed file types in bundle: `png`, `jpg`, `jpeg`, `webp`, `gif`, `svg`, `glb`, `gltf`, `mp3`, `ogg`, `wav`, `json`
+- Theme ID must be **kebab-case** (e.g. `my-office-theme`)
+- Version must follow **semver** format (e.g. `1.0.0`)
+
+## Slot Bindings
+
+Each theme has multiple **slots** — positions where agents can be placed. A slot binding maps a `(themeId, slotIndex)` pair to a specific agent.
+
+```
+Theme: "cozy-office"
+├── Slot 0 → Agent "Assistant"
+├── Slot 1 → Agent "Code Reviewer"
+└── Slot 2 → (empty)
+```
+
+Key behaviors:
+- **Move semantics** — Assigning an agent to a new slot automatically removes it from its previous slot in the same theme
+- **Conflict resolution** — If a slot is already occupied, the new agent replaces the old one
+- You can only bind agents that you own
+
+## SSE Stream
+
+The `/api/office/stream` endpoint provides **Server-Sent Events** for real-time monitoring.
+
+```
+Client                     Server
+  │                          │
+  │── GET /office/stream ──→ │
+  │                          │
+  │←── [full snapshot] ──────│   (initial state)
+  │←── [agent online] ───────│   (incremental update)
+  │←── [agent offline] ──────│   (incremental update)
+  │←── [status change] ──────│   (incremental update)
+  │         ...               │
+```
+
+The connection stays open with keep-alive. The first event always contains the complete snapshot of all agents.
+
+## Events
+
+Agents report their activity to the office via `POST /api/office/event`. Events are published from the OpenClaw plugin using the agent's bot token.
+
+The server enforces that the `agent_id` in the event payload matches the authenticated agent, preventing spoofing.
+
+Events are broadcast to all connected SSE clients, keeping the office visualization up to date.

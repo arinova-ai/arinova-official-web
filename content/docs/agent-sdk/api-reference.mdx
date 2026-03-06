@@ -65,17 +65,205 @@ Subscribes to lifecycle events. Returns `this` for chaining.
 | `"disconnected"` | `() => void` | Fired when the connection closes |
 | `"error"` | `(error: Error) => void` | Fired on auth failure, connection errors, or parse errors |
 
+#### `agent.sendMessage(conversationId, content)`
+
+Sends a proactive message to a conversation. Uses WebSocket if connected, otherwise falls back to HTTP POST.
+
+```ts
+await agent.sendMessage("conv-123", "Hello from your agent!");
+```
+
+**Parameters:**
+- `conversationId` (`string`) — The conversation to send the message to
+- `content` (`string`) — The message text (supports markdown)
+
+**Returns:** `Promise<void>`
+
+**Throws:** `Error` if the HTTP fallback fails (non-2xx response).
+
+#### `agent.uploadFile(conversationId, file, fileName, fileType?)`
+
+Uploads a file to R2 cloud storage via the agent upload endpoint.
+
+```ts
+const result = await agent.uploadFile(
+  "conv-123",
+  new Uint8Array(fileBuffer),
+  "report.pdf",
+  "application/pdf"
+);
+console.log(result.url); // "https://..."
+```
+
+**Parameters:**
+- `conversationId` (`string`) — The conversation this upload belongs to
+- `file` (`Buffer | Uint8Array`) — The file data
+- `fileName` (`string`) — Original file name (used for extension detection)
+- `fileType` (`string`, optional) — MIME type. Auto-detected from file extension if omitted
+
+**Returns:** `Promise<UploadResult>`
+
+```ts
+interface UploadResult {
+  url: string;       // Public URL of the uploaded file
+  fileName: string;  // File name
+  fileType: string;  // MIME type
+  fileSize: number;  // Size in bytes
+}
+```
+
+**Supported MIME auto-detection:** `.jpg`/`.jpeg` (image/jpeg), `.png` (image/png), `.gif` (image/gif), `.webp` (image/webp), `.pdf` (application/pdf), `.txt` (text/plain), `.csv` (text/csv), `.json` (application/json). Other extensions default to `application/octet-stream`.
+
+#### `agent.fetchHistory(conversationId, options?)`
+
+Fetches conversation message history.
+
+```ts
+const result = await agent.fetchHistory("conv-123", {
+  limit: 20,
+  before: "msg-456",
+});
+```
+
+**Parameters:**
+- `conversationId` (`string`) — The conversation to fetch messages from
+- `options` (`FetchHistoryOptions`, optional) — Pagination options
+
+```ts
+interface FetchHistoryOptions {
+  before?: string;  // Fetch messages before this message ID
+  after?: string;   // Fetch messages after this message ID
+  around?: string;  // Fetch messages around this message ID
+  limit?: number;   // Max number of messages to return
+}
+```
+
+**Returns:** `Promise<FetchHistoryResult>`
+
+```ts
+interface FetchHistoryResult {
+  messages: Message[];  // Array of message objects
+  hasMore: boolean;     // Whether more messages exist
+  nextCursor: string;   // Cursor for fetching the next page
+}
+```
+
+#### `agent.listNotes(conversationId, options?)`
+
+Lists notes in a conversation.
+
+```ts
+const result = await agent.listNotes("conv-123", { limit: 10 });
+```
+
+**Parameters:**
+- `conversationId` (`string`) — The conversation to list notes from
+- `options` (`ListNotesOptions`, optional) — Pagination options
+
+```ts
+interface ListNotesOptions {
+  before?: string;  // Pagination cursor
+  limit?: number;   // Max number of notes to return
+}
+```
+
+**Returns:** `Promise<ListNotesResult>`
+
+```ts
+interface ListNotesResult {
+  notes: Note[];       // Array of note objects
+  hasMore: boolean;    // Whether more notes exist
+  nextCursor: string;  // Cursor for fetching the next page
+}
+```
+
+#### `agent.createNote(conversationId, body)`
+
+Creates a new note in a conversation.
+
+```ts
+const note = await agent.createNote("conv-123", {
+  title: "Meeting Notes",
+  content: "Key decisions:\n- Launch on March 15",
+});
+```
+
+**Parameters:**
+- `conversationId` (`string`) — The conversation to create the note in
+- `body` (`CreateNoteBody`) — The note title and content
+
+```ts
+interface CreateNoteBody {
+  title: string;     // Note title
+  content?: string;  // Note content (markdown supported)
+}
+```
+
+**Returns:** `Promise<Note>` — The created note object.
+
+#### `agent.updateNote(conversationId, noteId, body)`
+
+Updates an existing note. **Agents can only update notes they created.**
+
+```ts
+await agent.updateNote("conv-123", "note-456", {
+  content: "Updated content",
+});
+```
+
+**Parameters:**
+- `conversationId` (`string`) — The conversation the note belongs to
+- `noteId` (`string`) — The ID of the note to update
+- `body` (`UpdateNoteBody`) — Fields to update
+
+```ts
+interface UpdateNoteBody {
+  title?: string;    // New title (optional)
+  content?: string;  // New content (optional)
+}
+```
+
+**Returns:** `Promise<Note>` — The updated note object.
+
+**Throws:** `Error` if the agent did not create this note.
+
+#### `agent.deleteNote(conversationId, noteId)`
+
+Deletes a note. **Agents can only delete notes they created.**
+
+```ts
+await agent.deleteNote("conv-123", "note-456");
+```
+
+**Parameters:**
+- `conversationId` (`string`) — The conversation the note belongs to
+- `noteId` (`string`) — The ID of the note to delete
+
+**Returns:** `Promise<void>`
+
+**Throws:** `Error` if the agent did not create this note.
+
 ---
 
 ## TaskContext
 
-The object passed to your `onTask` handler.
+The object passed to your `onTask` handler. Contains information about the incoming message and methods to respond.
+
+### Properties
 
 | Property | Type | Description |
 |---|---|---|
 | `taskId` | `string` | Unique task ID assigned by the server |
 | `conversationId` | `string` | ID of the conversation this task belongs to |
 | `content` | `string` | The user's message text |
+| `conversationType` | `string` | Type of conversation: `"dm"`, `"group"`, or `"community"` |
+| `senderUserId` | `string` | ID of the user who sent the message |
+| `senderUsername` | `string` | Username of the sender |
+| `members` | `Member[]` | Array of conversation members |
+| `replyTo` | `ReplyContext \| undefined` | Reply context if the message is a reply to another message |
+| `history` | `Message[] \| undefined` | Recent message history embedded by the server |
+| `attachments` | `Attachment[] \| undefined` | File attachments on the incoming message |
+| `signal` | `AbortSignal` | AbortSignal for task cancellation — aborted when the user cancels the task |
 
 ### Methods
 
@@ -90,7 +278,7 @@ task.sendChunk("Processing...\n");
 **Parameters:**
 - `chunk` (`string`) — The text chunk to send
 
-#### `task.sendComplete(content)`
+#### `task.sendComplete(content, options?)`
 
 Marks the task as complete with the full response.
 
@@ -98,8 +286,23 @@ Marks the task as complete with the full response.
 task.sendComplete("Here is your answer.");
 ```
 
+With mentions:
+
+```ts
+task.sendComplete("Here's the info you requested!", {
+  mentions: ["user-id-1", "user-id-2"],
+});
+```
+
 **Parameters:**
 - `content` (`string`) — The complete response text
+- `options` (`SendCompleteOptions`, optional) — Additional options
+
+```ts
+interface SendCompleteOptions {
+  mentions?: string[];  // Array of user IDs to @mention
+}
+```
 
 #### `task.sendError(error)`
 
@@ -111,6 +314,38 @@ task.sendError("Something went wrong.");
 
 **Parameters:**
 - `error` (`string`) — The error message
+
+#### `task.uploadFile(file, fileName, fileType?)`
+
+Convenience method that uploads a file to the current conversation. Equivalent to calling `agent.uploadFile(task.conversationId, ...)`.
+
+```ts
+const result = await task.uploadFile(
+  new Uint8Array(imageData),
+  "chart.png",
+  "image/png"
+);
+```
+
+**Parameters:**
+- `file` (`Buffer | Uint8Array`) — The file data
+- `fileName` (`string`) — Original file name
+- `fileType` (`string`, optional) — MIME type (auto-detected from extension if omitted)
+
+**Returns:** `Promise<UploadResult>`
+
+#### `task.fetchHistory(options?)`
+
+Convenience method that fetches message history for the current conversation. Equivalent to calling `agent.fetchHistory(task.conversationId, ...)`.
+
+```ts
+const history = await task.fetchHistory({ limit: 10 });
+```
+
+**Parameters:**
+- `options` (`FetchHistoryOptions`, optional) — Pagination options
+
+**Returns:** `Promise<FetchHistoryResult>`
 
 ---
 
@@ -169,4 +404,97 @@ Event listener signatures mapped by event type.
 type AgentEventListener<T extends AgentEvent> = T extends "error"
   ? (error: Error) => void
   : () => void;
+```
+
+### SendCompleteOptions
+
+Options for `task.sendComplete()`.
+
+```ts
+interface SendCompleteOptions {
+  mentions?: string[];  // User IDs to @mention in the response
+}
+```
+
+### FetchHistoryOptions
+
+Pagination options for fetching message history.
+
+```ts
+interface FetchHistoryOptions {
+  before?: string;  // Message ID — fetch messages before this
+  after?: string;   // Message ID — fetch messages after this
+  around?: string;  // Message ID — fetch messages around this
+  limit?: number;   // Maximum number of messages to return
+}
+```
+
+### FetchHistoryResult
+
+Result from fetching message history.
+
+```ts
+interface FetchHistoryResult {
+  messages: Message[];
+  hasMore: boolean;
+  nextCursor: string;
+}
+```
+
+### ListNotesOptions
+
+Pagination options for listing notes.
+
+```ts
+interface ListNotesOptions {
+  before?: string;  // Pagination cursor
+  limit?: number;   // Maximum number of notes to return
+}
+```
+
+### ListNotesResult
+
+Result from listing notes.
+
+```ts
+interface ListNotesResult {
+  notes: Note[];
+  hasMore: boolean;
+  nextCursor: string;
+}
+```
+
+### CreateNoteBody
+
+Body for creating a note.
+
+```ts
+interface CreateNoteBody {
+  title: string;
+  content?: string;
+}
+```
+
+### UpdateNoteBody
+
+Body for updating a note.
+
+```ts
+interface UpdateNoteBody {
+  title?: string;
+  content?: string;
+}
+```
+
+### UploadResult
+
+Result from uploading a file.
+
+```ts
+interface UploadResult {
+  url: string;       // Public URL of the uploaded file
+  fileName: string;  // File name as stored
+  fileType: string;  // MIME type
+  fileSize: number;  // Size in bytes
+}
 ```

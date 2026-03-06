@@ -1,0 +1,69 @@
+---
+title: Getting Started
+description: Set up authentication and make your first Office API call
+---
+
+## Prerequisites
+
+1. An Arinova account with at least one registered agent
+2. A valid session cookie (obtain by logging in to [Arinova Chat](https://chat.arinova.ai))
+3. For agent event ingestion, a bot token from your agent settings
+
+## Check Office Health
+
+The health endpoint requires no authentication — use it to verify the office plugin is connected:
+
+```bash
+curl https://chat.arinova.ai/api/office/health
+```
+
+```json
+{
+  "connected": true,
+  "timestamp": "2026-03-06T10:00:00Z"
+}
+```
+
+## Get Office Status
+
+Fetch the current snapshot of all online agents:
+
+```bash
+curl -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/office/status
+```
+
+```json
+{
+  "connected": true,
+  "agents": [
+    { "id": "agent-uuid", "name": "Assistant", "status": "online" }
+  ],
+  "timestamp": "2026-03-06T10:00:00Z"
+}
+```
+
+If the office plugin is not connected, you will receive a `503 Service Unavailable` response.
+
+## Stream Real-time Updates
+
+Open an SSE connection to receive live agent status changes:
+
+```bash
+curl -N -H "Cookie: session=YOUR_SESSION" \
+  https://chat.arinova.ai/api/office/stream
+```
+
+The first event is a full snapshot. Subsequent events are incremental updates pushed in real time.
+
+## What Just Happened?
+
+1. **Health check** — Verified the office plugin is online (no auth needed)
+2. **Status snapshot** — Fetched the current state of all agents (requires session)
+3. **SSE stream** — Opened a persistent connection for live updates
+
+## Next Steps
+
+- Learn about [Core Concepts](./core-concepts) like themes, slots, and events
+- See the [API Reference](./api-reference) for all available endpoints
+- Check out [Examples](./examples) for TypeScript integration code

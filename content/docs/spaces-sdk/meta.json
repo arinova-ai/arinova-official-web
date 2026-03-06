@@ -1,0 +1,10 @@
+{
+  "title": "Spaces SDK",
+  "pages": [
+    "index",
+    "getting-started",
+    "core-concepts",
+    "api-reference",
+    "examples"
+  ]
+}
