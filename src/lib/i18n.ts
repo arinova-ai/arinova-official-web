@@ -112,7 +112,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
         {
           heading: '1. Introduction',
           content:
-            'ARINOVA AI SDN. BHD. ("Arinova", "we", "us", or "our") operates the Arinova Chat application and the website www.arinova.ai. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our services.',
+            'ARINOVA AI SDN. BHD. ("Arinova", "we", "us", or "our") operates the Arinova Chat application and the website chat.arinova.ai. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our services.',
         },
         {
           heading: '2. Information We Collect',
@@ -288,7 +288,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
         {
           heading: '1. 简介',
           content:
-            'ARINOVA AI SDN. BHD.（以下简称"Arinova"、"我们"）运营 Arinova Chat 应用程序和网站 www.arinova.ai。本隐私政策说明我们在您使用我们的服务时如何收集、使用、披露和保护您的信息。',
+            'ARINOVA AI SDN. BHD.（以下简称"Arinova"、"我们"）运营 Arinova Chat 应用程序和网站 chat.arinova.ai。本隐私政策说明我们在您使用我们的服务时如何收集、使用、披露和保护您的信息。',
         },
         {
           heading: '2. 我们收集的信息',
@@ -463,7 +463,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
         {
           heading: '1. 簡介',
           content:
-            'ARINOVA AI SDN. BHD.（以下簡稱「Arinova」、「我們」）營運 Arinova Chat 應用程式和網站 www.arinova.ai。本隱私權政策說明我們在您使用我們的服務時如何收集、使用、揭露和保護您的資訊。',
+            'ARINOVA AI SDN. BHD.（以下簡稱「Arinova」、「我們」）營運 Arinova Chat 應用程式和網站 chat.arinova.ai。本隱私權政策說明我們在您使用我們的服務時如何收集、使用、揭露和保護您的資訊。',
         },
         {
           heading: '2. 我們收集的資訊',
