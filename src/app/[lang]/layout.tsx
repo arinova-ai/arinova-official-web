@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 import { isValidLocale, type Locale } from '@/lib/i18n';
 import { Header } from '@/components/header';
+import { Footer } from '@/components/footer';
 
 export default async function LangLayout({
   children,
@@ -16,7 +17,8 @@ export default async function LangLayout({
   return (
     <>
       <Header lang={lang as Locale} />
-      {children}
+      <div className="flex-1">{children}</div>
+      <Footer lang={lang as Locale} />
     </>
   );
 }
