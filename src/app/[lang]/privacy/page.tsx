@@ -1,13 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { isValidLocale } from '@/lib/i18n';
-import { privacyPolicies } from './policy';
-
-const descriptions = {
-  en: 'Learn how Arinova collects, uses, and protects your information.',
-  'zh-TW': '了解 Arinova 如何蒐集、使用及保護您的資訊。',
-  'zh-CN': '了解 Arinova 如何收集、使用和保护您的信息。',
-};
+import { privacyPolicy } from './policy';
 
 export async function generateMetadata({
   params,
@@ -18,8 +12,8 @@ export async function generateMetadata({
   if (!isValidLocale(lang)) notFound();
 
   return {
-    title: privacyPolicies[lang].title,
-    description: descriptions[lang],
+    title: privacyPolicy.title,
+    description: 'Learn how Arinova collects, uses, and protects your information.',
   };
 }
 
@@ -31,15 +25,18 @@ export default async function PrivacyPage({
   const { lang } = await params;
   if (!isValidLocale(lang)) notFound();
 
-  const policy = privacyPolicies[lang];
-
   return (
-    <main lang={lang} className="mx-auto max-w-3xl px-4 py-16 sm:py-24">
-      <h1 className="text-3xl font-bold sm:text-4xl">{policy.title}</h1>
+    <main lang="en" className="mx-auto max-w-3xl px-4 py-16 sm:py-24">
+      {lang !== 'en' && (
+        <p className="mb-2 text-sm text-fd-muted-foreground">
+          This page is available in English only.
+        </p>
+      )}
+      <h1 className="text-3xl font-bold sm:text-4xl">{privacyPolicy.title}</h1>
       <p className="mt-2 text-sm text-fd-muted-foreground">
-        {policy.effectiveDate}
+        {privacyPolicy.effectiveDate}
       </p>
-      <p className="text-sm text-fd-muted-foreground">{policy.lastUpdated}</p>
+      <p className="text-sm text-fd-muted-foreground">{privacyPolicy.lastUpdated}</p>
       <a href="https://chat.arinova.ai" className="mt-2 inline-block text-sm underline">
         Arinova Chat (chat.arinova.ai)
       </a>
@@ -52,7 +49,7 @@ export default async function PrivacyPage({
           [&_ul]:ps-6 [&_a]:text-fd-foreground [&_a]:underline
           [&_hr]:border-fd-border [&_hr+p]:text-sm [&_hr+p]:italic"
       >
-        {policy.body}
+        {privacyPolicy.body}
       </div>
     </main>
   );
