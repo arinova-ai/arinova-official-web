@@ -1,0 +1,24 @@
+{
+  "en": {
+    "title": "Delete your Arinova account",
+    "description": "Learn how to delete your Arinova account and what happens to your account and data.",
+    "publisher": "App: Arinova Chat. Developer: Arinova AI Sdn. Bhd.",
+    "appTitle": "In the Arinova Chat app",
+    "appBody": "Open Settings → Security → Danger Zone. Select Delete Account and follow the confirmation steps.",
+    "webTitle": "On the web",
+    "privacyLabel": "Privacy Policy",
+    "webBody": "On the Arinova Chat website, go to Settings → Security → Danger Zone. Select Delete Account and follow the confirmation steps. If you’re signed out, sign in to return to the account deletion settings.",
+    "settingsLabel": "Go to account deletion settings",
+    "contactTitle": "If you can’t sign in or confirm deletion",
+    "contactBefore": "Email ",
+    "contactAfter": " with your Arinova account email address and a request to delete your account. Please leave out passwords and verification codes.",
+    "deletionTitle": "What happens to your account and data",
+    "deletionBody": "After you confirm, we deactivate your account and revoke your active sessions and app authorizations. You can recover your account within 30 days by signing in with your password or a linked Google, GitHub, or Apple account. If you can't sign in that way, email privacy@arinova.ai within 30 days and we'll reply with the options available. After the recovery period, we schedule permanent deletion of your account, profile and related private data, including settings, private files and documents, and Agents you own and their memories. Some files are cleaned up separately and may take longer.",
+    "retentionTitle": "What we retain",
+    "retentionBody": "Some messages in shared conversations, community comments and reviews may remain with the link to your former account removed. We retain some transaction and audit records to process transactions, resolve disputes and meet legal obligations. Paid or returned creator withdrawals may require us to keep some identity, tax and payout evidence. How long we retain those records depends on the record and applicable requirements.",
+    "backupBody": "Our documented retention periods for offsite database backups are 31 days for daily backups and 35 days each for weekly backups and recovery logs. We have not verified that all copies expire on those schedules. Full database backups have no confirmed deletion deadline. Separate backup copies of uploaded files have no fixed deletion deadline. To ask about or request deletion of backup copies, email privacy@arinova.ai.",
+    "privacyBefore": "See the “Data Retention” section of the ",
+    "privacyAfter": ".",
+    "footerLabel": "Account Deletion"
+  }
+}
