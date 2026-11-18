@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { isValidLocale } from '@/lib/i18n';
 import { privacyPolicy } from './policy';
 
+const englishPageUrl = 'https://www.arinova.ai/en/privacy';
+
 export async function generateMetadata({
   params,
 }: {
@@ -14,6 +16,10 @@ export async function generateMetadata({
   return {
     title: privacyPolicy.title,
     description: 'Learn how Arinova collects, uses, and protects your information.',
+    alternates: {
+      canonical: englishPageUrl,
+      languages: { en: englishPageUrl, 'x-default': englishPageUrl },
+    },
   };
 }
 
