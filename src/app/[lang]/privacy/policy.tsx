@@ -17,7 +17,7 @@ export const privacyPolicies: Record<Locale, PrivacyPolicy> = {
       <>
         <section>
           <h2>1. Introduction</h2>
-          <p>This Privacy Policy (“Policy”) describes how Arinova (“Company,” “we,” “us,” or “our”) collects, uses, stores, shares, and protects your personal information when you access or use the Arinova platform, including all associated websites, applications, services, features, and content (collectively, the “Service”).</p>
+          <p>This Privacy Policy (“Policy”) describes how Arinova AI Sdn. Bhd. (“Arinova,” “Company,” “we,” “us,” or “our”) collects, uses, stores, shares, and protects your personal information when you access or use the Arinova platform, including all associated websites, applications, services, features, and content (collectively, the “Service”).</p>
           <p>By accessing or using the Service, you acknowledge that you have read and understood this Policy. If you do not agree with the practices described herein, please do not use the Service.</p>
         </section>
         <section>
@@ -135,7 +135,7 @@ export const privacyPolicies: Record<Locale, PrivacyPolicy> = {
       <>
         <section>
           <h2>第一條　前言</h2>
-          <p>本隱私權政策（以下簡稱“本政策”）說明 Arinova（以下簡稱“本公司”、“我們”）於您存取或使用 Arinova 平台（包括所有相關網站、應用程式、服務、功能及內容，以下合稱“本服務”）時，如何蒐集、使用、儲存、分享及保護您的個人資訊。</p>
+          <p>本隱私權政策（以下簡稱“本政策”）說明 Arinova AI Sdn. Bhd.（以下簡稱“Arinova”、“本公司”、“我們”）於您存取或使用 Arinova 平台（包括所有相關網站、應用程式、服務、功能及內容，以下合稱“本服務”）時，如何蒐集、使用、儲存、分享及保護您的個人資訊。</p>
           <p>存取或使用本服務，即表示您已閱讀並瞭解本政策。若您不同意本政策所述之作法，請勿使用本服務。</p>
         </section>
         <section>
@@ -253,7 +253,7 @@ export const privacyPolicies: Record<Locale, PrivacyPolicy> = {
       <>
         <section>
           <h2>第一条　前言</h2>
-          <p>本隐私权政策（以下简称“本政策”）说明 Arinova（以下简称“本公司”、“我们”）于您存取或使用 Arinova 平台（包括所有相关网站、应用程式、服务、功能及内容，以下合称“本服务”）时，如何搜集、使用、储存、分享及保护您的个人资讯。</p>
+          <p>本隐私权政策（以下简称“本政策”）说明 Arinova AI Sdn. Bhd.（以下简称“Arinova”、“本公司”、“我们”）于您存取或使用 Arinova 平台（包括所有相关网站、应用程式、服务、功能及内容，以下合称“本服务”）时，如何搜集、使用、储存、分享及保护您的个人资讯。</p>
           <p>存取或使用本服务，即表示您已阅读并了解本政策。若您不同意本政策所述之作法，请勿使用本服务。</p>
         </section>
         <section>
