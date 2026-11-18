@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import accountDeletionCopy from '@/lib/account-deletion.json';
 import type { Locale } from '@/lib/i18n';
 import { dictionaries } from '@/lib/i18n';
 import { ArinovaLogo } from './logo';
@@ -23,6 +24,12 @@ export function Footer({ lang }: { lang: Locale }) {
               className="hover:text-fd-foreground transition-colors"
             >
               {dict.privacy}
+            </Link>
+            <Link
+              href={`/${lang}/account-deletion`}
+              className="hover:text-fd-foreground transition-colors"
+            >
+              {accountDeletionCopy[lang].footerLabel}
             </Link>
             <Link
               href={`/${lang}/terms`}
