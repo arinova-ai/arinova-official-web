@@ -1,5 +1,27 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { isValidLocale, dictionaries, type Locale } from '@/lib/i18n';
+import { isValidLocale } from '@/lib/i18n';
+import { privacyPolicy } from './policy';
+
+const englishPageUrl = 'https://www.arinova.ai/en/privacy';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const { lang } = await params;
+  if (!isValidLocale(lang)) notFound();
+
+  return {
+    title: privacyPolicy.title,
+    description: 'Learn how Arinova collects, uses, and protects your information.',
+    alternates: {
+      canonical: englishPageUrl,
+      languages: { en: englishPageUrl, 'x-default': englishPageUrl },
+    },
+  };
+}
 
 export default async function PrivacyPage({
   params,
@@ -9,24 +31,31 @@ export default async function PrivacyPage({
   const { lang } = await params;
   if (!isValidLocale(lang)) notFound();
 
-  const dict = dictionaries[lang as Locale].privacy;
-
   return (
-    <main className="mx-auto max-w-3xl px-4 py-16 sm:py-24">
-      <h1 className="text-3xl font-bold sm:text-4xl">{dict.title}</h1>
+    <main lang="en" className="mx-auto max-w-3xl px-4 py-16 sm:py-24">
+      {lang !== 'en' && (
+        <p className="mb-2 text-sm text-fd-muted-foreground">
+          This page is available in English only.
+        </p>
+      )}
+      <h1 className="text-3xl font-bold sm:text-4xl">{privacyPolicy.title}</h1>
       <p className="mt-2 text-sm text-fd-muted-foreground">
-        {dict.lastUpdated}
+        {privacyPolicy.effectiveDate}
       </p>
+      <p className="text-sm text-fd-muted-foreground">{privacyPolicy.lastUpdated}</p>
+      <a href="https://chat.arinova.ai" className="mt-2 inline-block text-sm underline">
+        Arinova Chat (chat.arinova.ai)
+      </a>
 
-      <div className="mt-10 space-y-8">
-        {dict.sections.map((section) => (
-          <section key={section.heading}>
-            <h2 className="text-lg font-semibold">{section.heading}</h2>
-            <p className="mt-2 leading-7 text-fd-muted-foreground">
-              {section.content}
-            </p>
-          </section>
-        ))}
+      <div
+        className="mt-10 space-y-8 leading-7 text-fd-muted-foreground
+          [&_section]:space-y-2 [&_h2]:text-lg [&_h2]:font-semibold
+          [&_h3]:pt-2 [&_h3]:font-semibold [&_h2]:text-fd-foreground
+          [&_h3]:text-fd-foreground [&_ul]:list-disc [&_ul]:space-y-1
+          [&_ul]:ps-6 [&_a]:text-fd-foreground [&_a]:underline
+          [&_hr]:border-fd-border [&_hr+p]:text-sm [&_hr+p]:italic"
+      >
+        {privacyPolicy.body}
       </div>
     </main>
   );
