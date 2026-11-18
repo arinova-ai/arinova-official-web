@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import accountDeletionCopy from '@/lib/account-deletion.json';
-import { defaultLocale, isValidLocale, locales } from '@/lib/i18n';
+import { isValidLocale } from '@/lib/i18n';
 
-const site = 'https://www.arinova.ai';
+const englishPageUrl = 'https://www.arinova.ai/en/account-deletion';
+const { en: copy } = accountDeletionCopy;
 const settingsUrl = 'https://chat.arinova.ai/settings?section=security';
 const privacyEmail = 'privacy@arinova.ai';
 
@@ -16,16 +17,13 @@ export async function generateMetadata({ params }: AccountDeletionProps): Promis
   const { lang } = await params;
   if (!isValidLocale(lang)) notFound();
 
-  const { title, description } = accountDeletionCopy[lang];
+  const { title, description } = copy;
   return {
     title,
     description,
     alternates: {
-      canonical: `${site}/${lang}/account-deletion`,
-      languages: {
-        ...Object.fromEntries(locales.map((locale) => [locale, `${site}/${locale}/account-deletion`])),
-        'x-default': `${site}/${defaultLocale}/account-deletion`,
-      },
+      canonical: englishPageUrl,
+      languages: { en: englishPageUrl, 'x-default': englishPageUrl },
     },
   };
 }
@@ -34,10 +32,11 @@ export default async function AccountDeletionPage({ params }: AccountDeletionPro
   const { lang } = await params;
   if (!isValidLocale(lang)) notFound();
 
-  const copy = accountDeletionCopy[lang];
-
   return (
-    <main lang={lang} className="mx-auto max-w-3xl px-4 py-16 sm:py-24">
+    <main lang="en" className="mx-auto max-w-3xl px-4 py-16 sm:py-24">
+      {lang !== 'en' && (
+        <p className="mb-2 text-sm text-fd-muted-foreground">This page is available in English only.</p>
+      )}
       <h1 className="text-3xl font-bold sm:text-4xl">{copy.title}</h1>
       <p className="mt-2 text-sm text-fd-muted-foreground">{copy.publisher}</p>
 

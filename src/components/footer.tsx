@@ -29,7 +29,7 @@ export function Footer({ lang }: { lang: Locale }) {
               href={`/${lang}/account-deletion`}
               className="hover:text-fd-foreground transition-colors"
             >
-              {accountDeletionCopy[lang].footerLabel}
+              {accountDeletionCopy.en.footerLabel}
             </Link>
             <Link
               href={`/${lang}/terms`}
